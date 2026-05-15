@@ -1,0 +1,9 @@
+{
+  "name": "JARVIS Industrial Agent",
+  "short_name": "JARVIS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#0f0f0f",
+  "permissions": ["serial", "usb"]
+}

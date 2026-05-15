@@ -1,0 +1,9 @@
+{
+  "name": "1/0 iAgnt",
+  "description": "Agente de control multitarea industrial con soporte para Cloud Vision API, telemetría y gemelo digital 3D. Tema Google I/O.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": []
+}

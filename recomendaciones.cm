@@ -1,0 +1,44 @@
+ESTADO ACTUAL DEL PROYECTO (LO QUE YA TIENES):
+
+1. Interfaz Principal (NEXUS CORE):
+   - Kiosko de piso de planta con navegación moderna y efecto neón negro.
+   - Panel de control responsivo, estético y modo de Realidad Aumentada (AR).
+
+2. Gemelo Digital 3D (Digital Twin):
+   - Modelo CAD 3D (React Three Fiber) de una máquina CNC con animaciones, bordes (Edges) y texturas de daño/desgaste (scratch).
+   - Datos de telemetría en tiempo real sobrepuestos (Temperatura, Carga, Vibración).
+   - Tooltips interactivos con gráficas históricas (Recharts) habilitadas en el entorno AR.
+
+3. Vistas de Cámaras y Simulación:
+   - Cámaras cenital, térmica y de bandeja para monitoreo.
+   - Visualización simulada de corte por plasma y mantenimiento predictivo.
+
+4. Assembly Lab (Laboratorio de Ensamblaje 3D):
+   - Simulador 3D para diseñar el "Layout" de tu fábrica.
+   - Permite agregar y remover máquinas virtuales (CNC, Brazo Robótico, Banda Transportadora) en una cuadrícula.
+   - Movimiento de cámara orbital (OrbitControls) para analizar espacio y producción.
+
+5. Asistente de Voz IA:
+   - Interfaz y módulo de agente IA integrado (Nexus Core / Jarvis).
+
+==================================================
+
+RECOMENDACIONES PARA MEJORAS FUTURAS:
+
+1. Conexión de Datos IoT Reales (Sensores):
+   - Reemplazar los datos sintéticos (simulados) por un backend con WebSockets (.NET, Node.js) o MQTT para inyectar telemetría de PLCs o sensores reales de las CNC al código del Gemelo Digital.
+
+2. Servidor de Transmisión WebRTC (Cámaras Reales):
+   - En lugar de simulaciones 3D para las cámaras, conectar flujos RTSP/WebRTC de equipos físicos instalados en la planta directamente a la interfaz React.
+
+3. Base de Datos para el Assembly Lab:
+   - Actualmente las máquinas en el laboratorio 3D se pierden al recargar. Se recomienda integrar Firebase o Supabase para guardar la posición (X, Y, Z) de cada máquina y cargar tus "plantas o deparmamentos" al abrir la app.
+
+4. Importación de Modelos CAD (.gltf / .obj):
+   - Habilitar que el Assembly Lab permita subir archivos 3D de tus propias máquinas reales exportadas desde SolidWorks o AutoCAD.
+
+5. Autenticación y Niveles de Acceso:
+   - Crear roles: "Ingeniero" puede editar el "Assembly Lab" y AR, "Operador" solo puede ver y recibir alertas de calor/vibración.
+
+6. Visión Computacional (IA Vision):
+   - Agregar un agente Gemini 1.5 Pro que analice fotos periódicas de las cámaras para detectar anomalías, piezas defectuosas, o predecir fallas visualmente.
