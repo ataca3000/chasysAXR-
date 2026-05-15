@@ -14,8 +14,8 @@ services:
   mqtt-broker:
     image: eclipse-mosquitto:latest
     ports:
-      - "1883:1883"
-      - "9001:9001"
+      - "127.0.0.1:1883:1883"
+      - "127.0.0.1:9001:9001"
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
     restart: always
@@ -26,7 +26,7 @@ services:
   jarvis-ai:
     image: ollama/ollama:latest
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"
     volumes:
       - ollama-data:/root/.ollama
     restart: always

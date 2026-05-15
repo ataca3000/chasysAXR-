@@ -36,13 +36,18 @@ Sé muy técnico, conciso y responde en español como un sistema proactivo. No i
     });
     
     if (response.text) {
-        const parsed = JSON.parse(response.text);
-        return {
-            html: parsed.html || '<p>Análisis completado pero sin formato esperado.</p>',
-            gcode: parsed.gcode || []
+        try {
+          const parsed = JSON.parse(response.text);
+          return {
+              html: typeof parsed.html === 'string' ? parsed.html : '<p>Análisis completado pero sin formato esperado.</p>',
+              gcode: Array.isArray(parsed.gcode) ? parsed.gcode.slice(0, 50) : [] // Limit to 50 commands for safety
+          };
+        } catch (parseError) {
+          console.error('Failed to parse Gemini response as JSON:', response.text);
+          return { html: '<p>Error de procesamiento: La IA devolvió un formato inválido.</p>', gcode: [] };
         }
     }
-    return { html: '<p>No se pudo generar el análisis.</p>', gcode: [] };
+    return { html: '<p>No se pudo generar el análisis. Sin respuesta del motor.</p>', gcode: [] };
   } catch (error: any) {
     console.error('Error fetching Gemini recommendations:', error);
     throw new Error(`Error en la comunicación con el servicio de IA: ${error.message || 'Desconocido'}`);
