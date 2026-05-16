@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, AlertCircle, Scan, Maximize, Cpu, Smartphone, X, QrCode } from 'lucide-react';
+import { Camera, Scan, Cpu, Smartphone, X } from 'lucide-react';
 import { auth } from '../../firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { Peer } from 'peerjs';

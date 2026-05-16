@@ -123,17 +123,6 @@ export function HardwareControl() {
     addLog('[CRÍTICO] E-STOP ACTIVADO (HALT)');
   };
 
-  const toggleSpindle = () => {
-    if (spindleSpeed > 0) {
-      hardware.stopSpindle();
-      setSpindleSpeed(0);
-      addLog('[HMI] Motor detenido');
-    } else {
-      hardware.startSpindle(12000);
-      setSpindleSpeed(12000);
-      addLog('[HMI] Motor encendido a 12000 RPM');
-    }
-  };
 
   const sendCustomGcode = async (e: React.FormEvent) => {
     e.preventDefault();

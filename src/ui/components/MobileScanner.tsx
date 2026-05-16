@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, X, RefreshCw, Signal, AlertTriangle } from 'lucide-react';
+import { Camera, X, RefreshCw, Signal } from 'lucide-react';
 import { auth } from '../../firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import Peer from 'peerjs';
@@ -40,7 +40,7 @@ export function MobileScanner() {
       const p = new Peer(`vision-mob-${user.uid}`);
       setPeer(p);
 
-      p.on('open', (id) => {
+      p.on('open', () => {
         setStatus('Linking to desktop session...');
         const call = p.call(`vision-desk-${user.uid}`, stream);
         

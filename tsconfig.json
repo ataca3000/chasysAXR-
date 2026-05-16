@@ -25,5 +25,5 @@
     }
   },
   "include": ["src", "server.ts"],
-  "node_modules": ["node_modules"]
+  "exclude": ["node_modules", "dist"]
 }

@@ -82,8 +82,10 @@ async function startServer() {
     pathRewrite: {
       '^/api/ollama': '',
     },
-    onError: (err, req, res) => {
-      res.status(503).json({ error: "Ollama is not running. Please start Ollama on your machine." });
+    on: {
+      error: (_err, _req, res) => {
+        (res as any).status(503).json({ error: "Ollama is not running. Please start Ollama on your machine." });
+      }
     }
   });
   app.use('/api/ollama', ollamaProxy);

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, Scan, Target, Smartphone, CheckCircle, Crosshair } from 'lucide-react';
+import { Scan, Target, Smartphone, Crosshair } from 'lucide-react';
 
 export function JarvisAR() {
   const containerRef = useRef<HTMLDivElement>(null);

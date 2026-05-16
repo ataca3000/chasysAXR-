@@ -2,8 +2,7 @@ import mqtt from 'mqtt';
 
 export class HardwareController {
   private port: any | null = null;
-  private writer: WritableStreamDefaultWriter | null = null;
-  private reader: ReadableStreamDefaultReader | null = null;
+  private writer: WritableStreamDefaultWriter<string> | null = null;
   private ws: WebSocket | null = null;
   private mqttClient: mqtt.MqttClient | null = null;
 
@@ -31,7 +30,6 @@ export class HardwareController {
     this.sensorListeners.forEach(cb => cb(data));
   }
 
-  private customReadLoopPromise: Promise<void> | null = null;
   private isReading = false;
 
   async connectStream(url: string, topic?: string) {
@@ -60,7 +58,7 @@ export class HardwareController {
               if (this.onError) this.onError(`MQTT Error: ${err.message}`);
               resolve(false);
             });
-            this.mqttClient.on('message', (receivedTopic, message) => {
+            this.mqttClient.on('message', (_receivedTopic, message) => {
               try {
                 const msg = message.toString();
                 this.parseHardwareData(msg);
@@ -119,7 +117,7 @@ export class HardwareController {
       this.writer = textEncoder.writable.getWriter();
 
       this.isReading = true;
-      this.customReadLoopPromise = this.readLoop();
+      this.readLoop();
 
       console.log('Successfully connected to serial hardware.');
       return true;
@@ -135,7 +133,7 @@ export class HardwareController {
     
     // We create a decoder that splits the stream by strings
     const textDecoder = new TextDecoderStream();
-    const readableStreamClosed = this.port.readable.pipeTo(textDecoder.writable);
+    this.port.readable.pipeTo(textDecoder.writable);
     const reader = textDecoder.readable.getReader();
     this.reader = reader;
 

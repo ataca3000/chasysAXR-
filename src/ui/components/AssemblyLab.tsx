@@ -1,8 +1,7 @@
 import React, { useState, useEffect, Suspense, useRef } from 'react';
 import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls, Environment, Grid, Html, QuadraticBezierLine } from '@react-three/drei';
-import { Plus, Boxes, Trash2, Cloud, UploadCloud, LogIn, Upload, Link2, Unlink, X, Activity, WifiOff, Wifi, Clock, ArrowRightCircle } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Plus, Boxes, Trash2, Cloud, UploadCloud, LogIn, Upload, Link2, Unlink, X, Activity, WifiOff, Clock, ArrowRightCircle } from 'lucide-react';
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User } from 'firebase/auth';
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../../firebase';
@@ -32,7 +31,7 @@ const CustomModel = ({ url, fileExt }: { url: string; fileExt: string }) => {
   }
 };
 
-const MachineNode = ({ id, index, position, type, url, fileExt, images, isSelected, connectMode, isValidTarget, isInvalidTarget, onNodeClick, onRemove }: { id: string, index: number, position: [number, number, number], type: string, url?: string, fileExt?: string, images?: string[], isSelected?: boolean, connectMode?: boolean, isValidTarget?: boolean, isInvalidTarget?: boolean, onNodeClick?: (id: string) => void, onRemove: () => void }) => {
+const MachineNode = ({ id, index, position, type, url, fileExt, images, isSelected, _connectMode, isValidTarget, isInvalidTarget, onNodeClick, onRemove }: { id: string, index: number, position: [number, number, number], type: string, url?: string, fileExt?: string, images?: string[], isSelected?: boolean, connectMode?: boolean, isValidTarget?: boolean, isInvalidTarget?: boolean, onNodeClick?: (id: string) => void, onRemove: () => void }) => {
   return (
     <group 
       position={position}
@@ -149,7 +148,7 @@ const MachineNode = ({ id, index, position, type, url, fileExt, images, isSelect
 
 export function AssemblyLab() {
   const [machines, setMachines] = useState<{ id: string; type: string; position: [number, number, number]; sensors?: string[]; images?: string[] }[]>([]);
-  const [customMachines, setCustomMachines] = useState<{ id: string; type: string; position: [number, number, number]; url: string; fileExt: string; sensors?: string[] }[]>([]);
+  const [customMachines, setCustomMachines] = useState<{ id: string; type: string; position: [number, number, number]; url: string; fileExt: string; sensors?: string[]; images?: string[] }[]>([]);
   const [connections, setConnections] = useState<{ id: string; fromId: string; toId: string }[]>([]);
   const [connectMode, setConnectMode] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -176,7 +175,7 @@ export function AssemblyLab() {
     return unsub;
   }, [selectedMachineDetails]);
 
-  const allNodes: Array<{ id: string; type: string; position: [number, number, number]; url?: string; fileExt?: string }> = [...machines, ...customMachines];
+  const allNodes: Array<{ id: string; type: string; position: [number, number, number]; url?: string; fileExt?: string; sensors?: string[]; images?: string[] }> = [...machines, ...customMachines];
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (currentUser) => {

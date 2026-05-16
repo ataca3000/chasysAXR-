@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Box, Cylinder, Grid, Text, ContactShadows, Environment, Html, Sphere, Sparkles, Edges } from '@react-three/drei';
+import { OrbitControls, Box, Cylinder, Grid, ContactShadows, Environment, Html, Sphere, Sparkles, Edges } from '@react-three/drei';
 import { EffectComposer, N8AO } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { LineChart, Line, YAxis, ResponsiveContainer } from 'recharts';
@@ -65,9 +65,8 @@ function Tooltip({ position, text, status, value, unit, history, dataKey, color,
   );
 }
 
-export function CustomCNC({ position, status, label, telemetry, arMode, history, enabledSensors = [] }: any) {
+export function CustomCNC({ position, _status, label, telemetry, arMode, history, enabledSensors = [] }: any) {
   const isCriticalVib = telemetry?.vibration > 5;
-  const isCriticalTemp = telemetry?.temperature > 800;
 
   // Sensor absence checks
   const isMissingTemp = enabledSensors.includes('thermal') && (telemetry?.temperature === undefined || telemetry?.temperature === 0);
@@ -456,40 +455,13 @@ export function CustomCNC({ position, status, label, telemetry, arMode, history,
   );
 }
 
-function MachineBase({ position, color, label, status }: any) {
-  return (
-    <group position={position}>
-      <Box args={[3, 1, 2]} position={[0, 0.5, 0]}>
-        <meshStandardMaterial color={color} metalness={0.8} roughness={0.2} />
-      </Box>
-      <Cylinder args={[0.2, 0.2, 1.5]} position={[0, 1.5, 0]}>
-        <meshStandardMaterial color="#888" metalness={0.9} roughness={0.1} />
-      </Cylinder>
-      <Box args={[0.8, 0.8, 1]} position={[0, 2.3, 0]}>
-        <meshStandardMaterial color="#444" metalness={0.9} roughness={0.1} />
-      </Box>
-      
-      {/* Tool head / Laser / Plasma */}
-      <Cylinder args={[0.05, 0.1, 0.5]} position={[0, 1.8, 0.6]} rotation={[Math.PI / 2, 0, 0]}>
-        <meshStandardMaterial color="#e0e0e0" emissive={status === 'warning' ? 'red' : 'cyan'} emissiveIntensity={2} />
-      </Cylinder>
-
-      <Html position={[0, 3.5, 0]} center>
-        <div className="bg-slate-900/80 text-white px-3 py-1 rounded-md text-xs whitespace-nowrap border border-slate-600 backdrop-blur-sm">
-          {label}
-        </div>
-      </Html>
-    </group>
-  );
-}
-
 import { usePinch } from '@use-gesture/react';
 
-export default function DigitalTwin({ telemetry, arMode = false, history }: { telemetry: any, arMode?: boolean, history?: any[] }) {
+export default function DigitalTwin({ telemetry, arMode = false, history, enabledSensors = [] }: { telemetry: any, arMode?: boolean, history?: any[], enabledSensors?: string[] }) {
   const vibrStatus = telemetry.vibration > 5 ? 'warning' : 'ok';
   const tempStatus = telemetry.temperature > 800 ? 'warning' : 'ok';
   
-  const baseColor = vibrStatus === 'warning' || tempStatus === 'warning' ? '#cc4444' : '#2d3748';
+  // const baseColor = vibrStatus === 'warning' || tempStatus === 'warning' ? '#cc4444' : '#2d3748';
 
   const [sceneScale, setSceneScale] = useState(1);
 
@@ -545,6 +517,7 @@ export default function DigitalTwin({ telemetry, arMode = false, history }: { te
             telemetry={telemetry}
             arMode={arMode}
             history={history}
+            enabledSensors={enabledSensors}
           />
           
           <ContactShadows position={[0, 0, 0]} opacity={0.6} scale={20} blur={2} far={10} color="#ff0000" />

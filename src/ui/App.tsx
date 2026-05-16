@@ -7,10 +7,7 @@ import { getAgentRecommendations } from '../services/geminiService';
 import { CameraFeeds } from './components/CameraFeeds';
 import { HardwareControl } from './components/HardwareControl';
 import { VisionAnalyzer } from './components/VisionAnalyzer';
-import { Particle10 } from './components/Particle10';
-import { DNAOverlay } from './components/DNAOverlay';
 import { ARCameraLayer } from './components/ARCameraLayer';
-import { JarvisAR } from './components/JarvisAR';
 import { hardware } from '../services/hardwareController';
 import { VoiceAssistant } from './components/VoiceAssistant';
 import { AssemblyLab } from './components/AssemblyLab';
@@ -57,7 +54,6 @@ export default function App() {
   };
 
   const [activeView, setActiveView] = useState('command_center');
-  const activeViewObj = useMemo(() => activeView, [activeView]);
 
   const [isCriticalAlarm, setIsCriticalAlarm] = useState(false);
   const lastHardwareUpdateRef = useRef<number>(0);
