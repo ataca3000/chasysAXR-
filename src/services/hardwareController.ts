@@ -35,16 +35,24 @@ export class HardwareController {
   private isReading = false;
 
   async connectStream(url: string, topic?: string) {
+    if (!url) {
+      if (this.onError) this.onError('Connection failed: Empty URL provided');
+      return false;
+    }
+
     return new Promise<boolean>((resolve) => {
       try {
-        if (url.startsWith('mqtt://') || url.startsWith('ws://') || url.startsWith('wss://')) {
-          if (url.includes('mqtt') || topic) { // crude heuristic
-            // Fallback to MQTT
-            this.mqttClient = mqtt.connect(url);
+        const protocol = url.split(':')[0];
+        if (['mqtt', 'ws', 'wss'].includes(protocol)) {
+          if (protocol === 'mqtt' || topic) {
+            this.mqttClient = mqtt.connect(url, {
+              connectTimeout: 5000,
+              reconnectPeriod: 2000
+            });
             this.mqttClient.on('connect', () => {
               console.log('Connected to MQTT Broker:', url);
               if (topic) this.mqttClient?.subscribe(topic);
-              else this.mqttClient?.subscribe('#'); // Subscribe to all for testing
+              else this.mqttClient?.subscribe('#');
               resolve(true);
             });
             this.mqttClient.on('error', (err) => {
@@ -53,12 +61,14 @@ export class HardwareController {
               resolve(false);
             });
             this.mqttClient.on('message', (receivedTopic, message) => {
-              const msg = message.toString();
-              console.log(`📬 MQTT RX [${receivedTopic}]:`, msg);
-              this.parseHardwareData(msg);
+              try {
+                const msg = message.toString();
+                this.parseHardwareData(msg);
+              } catch (e) {
+                console.error('Error processing MQTT message:', e);
+              }
             });
           } else {
-            // Standard WebSocket
             this.ws = new WebSocket(url);
             this.ws.onopen = () => {
               console.log('Connected to WebSocket:', url);
@@ -66,21 +76,23 @@ export class HardwareController {
             };
             this.ws.onerror = (e) => {
               console.error('WebSocket Error:', e);
-              if (this.onError) this.onError('WebSocket connection failed');
+              if (this.onError) this.onError('WebSocket connection failed. Verify URL and network.');
               resolve(false);
             };
             this.ws.onmessage = (event) => {
-              const msg = event.data;
-              console.log('📬 WS RX:', msg);
-              this.parseHardwareData(msg);
+              try {
+                this.parseHardwareData(event.data);
+              } catch (e) {
+                console.error('Error processing WebSocket message:', e);
+              }
             };
           }
         } else {
-          throw new Error('Invalid protocol. Use ws://, wss:// or mqtt://');
+          throw new Error(`Unsupported protocol: ${protocol}. Use ws://, wss:// or mqtt://`);
         }
       } catch (err: any) {
-         console.error('Connection error:', err);
-         if (this.onError) this.onError(`Connection failed: ${err.message}`);
+         console.error('Stream connection setup error:', err);
+         if (this.onError) this.onError(`Setup failed: ${err.message}`);
          resolve(false);
       }
     });
@@ -89,28 +101,31 @@ export class HardwareController {
   async connect() {
     const nav = navigator as any;
     if (!('serial' in nav)) {
-      console.error('Web Serial API no soportada en este navegador. Úsalo en Chrome/Edge en entornos no iframe.');
-      // Fallback para simulación en el iframe
-      return true;
+      const errorMsg = 'Web Serial API is not supported in this environment.';
+      console.error(errorMsg);
+      if (this.onError) this.onError(errorMsg);
+      return false;
     }
 
     try {
       this.port = await nav.serial.requestPort();
-      await this.port.open({ baudRate: 115200 }); // Configuración típica para GRBL/Marlin
+      await this.port.open({ baudRate: 115200 });
       
       const textEncoder = new TextEncoderStream();
-      const writableStreamClosed = textEncoder.readable.pipeTo(this.port.writable as WritableStream);
+      textEncoder.readable.pipeTo(this.port.writable as WritableStream).catch(e => {
+        console.error('Writable stream error:', e);
+        if (this.onError) this.onError(`Serial write error: ${e.message}`);
+      });
       this.writer = textEncoder.writable.getWriter();
 
-      // Start reading loop
       this.isReading = true;
       this.customReadLoopPromise = this.readLoop();
 
-      console.log('Conectado exitosamente al controlador de hardware (Arduino/PLC).');
+      console.log('Successfully connected to serial hardware.');
       return true;
     } catch (err: any) {
-      console.error('Error al conectar con Arduino:', err);
-      if (this.onError) this.onError(`Failed to connect to hardware: ${err.message || 'Unknown error'}`);
+      console.error('Serial connection error:', err);
+      if (this.onError) this.onError(`Hardware connection failed: ${err.message || 'Unknown error'}`);
       return false;
     }
   }
