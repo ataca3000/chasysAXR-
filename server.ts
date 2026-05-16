@@ -2,6 +2,12 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { createProxyMiddleware } from "http-proxy-middleware";
+import { GoogleGenAI, Type } from "@google/genai";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const ai = new GoogleGenAI(process.env.GEMINI_API_KEY || "");
 
 async function startServer() {
   const app = express();
@@ -90,13 +96,69 @@ async function startServer() {
   });
   app.use('/api/ollama', ollamaProxy);
 
-  // Example backend proxy for local container (Ollama) or private AI
+  // API Route to chat with the design companion (Jarvis)
   app.post("/api/chat", async (req, res) => {
     try {
-      const { prompt } = req.body;
-      res.json({ response: "Backend API received: " + prompt });
+      const { prompt, history, currentScene } = req.body;
+
+      const model = ai.getGenerativeModel({
+        model: "gemini-2.0-flash", // Using a stable model name
+      });
+
+      const response = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: `User Prompt: ${prompt}
+        
+HISTORY:
+${JSON.stringify(history)}
+
+CURRENT SCENE STATE:
+${JSON.stringify(currentScene)}
+` }] }],
+        generationConfig: {
+          systemInstruction: `You are Jarvis, a collaborative engineering and design companion focused on 3D prototyping and product creation.
+The user will give you instructions to create or modify a 3D scene.
+Your primary role is to interpret the user's creative requests and return a JSON object that strictly adheres to the schema.
+You perceive a blank 3D canvas and populate it with shapes based on the user's prompt. You learn from their preferences.
+You can create generic parametric shapes (box, sphere, cylinder, cone, torus).
+In the JSON, you MUST provide an array of 'shapes', each with an id, type, position [x,y,z], rotation [x,y,z], scale [x,y,z], and hex color.
+You must also provide a 'message' which is your companion response to the user.
+
+Keep your message concise, helpful, and engineering-focused.`,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              message: {
+                type: Type.STRING,
+                description: "Your conversational response as the Jarivs-like companion.",
+              },
+              shapes: {
+                type: Type.ARRAY,
+                description: "The complete array of shapes that should currently exist in the scene. If modifying, include both the modified and unmodified existing shapes.",
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id: { type: Type.STRING },
+                    type: { type: Type.STRING, description: "One of: box, sphere, cylinder, cone, torus" },
+                    position: { type: Type.ARRAY, items: { type: Type.NUMBER } },
+                    rotation: { type: Type.ARRAY, items: { type: Type.NUMBER } },
+                    scale: { type: Type.ARRAY, items: { type: Type.NUMBER } },
+                    color: { type: Type.STRING, description: "Hex color code" },
+                    wireframe: { type: Type.BOOLEAN, description: "Whether to render as wireframe" }
+                  },
+                  required: ["id", "type", "position", "rotation", "scale", "color"]
+                }
+              }
+            },
+            required: ["message", "shapes"]
+          }
+        },
+      });
+
+      res.json({ result: JSON.parse(response.response.text() || "{}") });
     } catch (error) {
-      res.status(500).json({ error: String(error) });
+      console.error("Gemini API Error:", error);
+      res.status(500).json({ error: "Failed to process request." });
     }
   });
 

@@ -92,11 +92,18 @@ export function LocalModelManager() {
   };
 
   const recommendedModels = [
-    { name: 'llama3:8b', label: 'Llama 3 (8B) - Equilibrado' },
-    { name: 'mistral', label: 'Mistral (7B) - Rápido' },
-    { name: 'phi3', label: 'Phi-3 (Mini) - Muy Ligero' },
-    { name: 'codellama', label: 'Code Llama - Especializado' }
+    { name: 'llama3.1:8b', label: 'Llama 3.1 (8B) - El Estándar' },
+    { name: 'qwen2.5:7b', label: 'Qwen 2.5 (7B) - Muy Potente' },
+    { name: 'deepseek-v2.5', label: 'DeepSeek v2.5 - Excelente Chat' },
+    { name: 'mistral-nemo', label: 'Mistral Nemo (12B) - Calidad Superior' },
+    { name: 'codestral', label: 'Codestral - Programación Pro' },
+    { name: 'gemma2:9b', label: 'Gemma 2 (9B) - Google SOTA' },
+    { name: 'phi3:mini', label: 'Phi-3 Mini (3.8B) - Ultraligero' },
+    { name: 'moondream', label: 'Moondream (Vision) - Análisis Imagen' },
+    { name: 'nomic-embed-text', label: 'Nomic Embed - Vectores/RAG' }
   ];
+
+  const [customModel, setCustomModel] = useState('');
 
   return (
     <div className="bg-slate-900/50 border border-white/10 rounded-xl p-6 backdrop-blur-xl">
@@ -128,35 +135,60 @@ export function LocalModelManager() {
         {/* Modelos Recomendados */}
         <div>
           <h3 className="text-slate-500 font-bold text-[10px] tracking-widest uppercase mb-3">MODELOS RECOMENDADOS</h3>
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
             {recommendedModels.map(model => {
               const isDownloaded = localModels.some(m => m.name.startsWith(model.name));
               const isPulling = pulling === model.name;
 
               return (
                 <div key={model.name} className="bg-black/40 border border-white/5 rounded-lg p-3 flex items-center justify-between group hover:border-white/20 transition-all">
-                  <div>
+                  <div className="flex-1">
                     <div className="text-sm font-bold text-white">{model.label}</div>
                     <div className="text-[10px] text-slate-500 font-mono uppercase">{model.name}</div>
                   </div>
                   
                   {isDownloaded ? (
-                    <div className="flex items-center gap-2 text-google-green text-xs font-bold">
-                      <CheckCircle2 size={16} /> INSTALADO
+                    <div className="flex items-center gap-2 text-google-green text-[10px] font-bold">
+                      <CheckCircle2 size={14} /> INSTALADO
                     </div>
                   ) : (
                     <button 
                       onClick={() => pullModel(model.name)}
                       disabled={!!pulling}
-                      className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-2 ${isPulling ? 'bg-google-blue/20 text-google-blue' : 'bg-google-blue text-white hover:bg-blue-600'}`}
+                      className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all flex items-center gap-2 ${isPulling ? 'bg-google-blue/20 text-google-blue' : 'bg-google-blue text-white hover:bg-blue-600 shadow-[0_0_10px_rgba(66,133,244,0.3)]'}`}
                     >
-                      {isPulling ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                      {isPulling ? 'PULLING...' : 'DESCARGAR'}
+                      {isPulling ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                      {isPulling ? 'BAJANDO' : 'INSTALAR'}
                     </button>
                   )}
                 </div>
               );
             })}
+          </div>
+
+          <div className="mt-4 p-3 bg-white/5 border border-dashed border-white/10 rounded-lg">
+             <h4 className="text-[9px] text-slate-500 font-bold tracking-widest uppercase mb-2">Instalación Manual</h4>
+             <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={customModel}
+                  onChange={(e) => setCustomModel(e.target.value)}
+                  placeholder="nombre-modelo:tag"
+                  className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-google-blue/50"
+                />
+                <button 
+                  onClick={() => {
+                    if (customModel.trim()) {
+                      pullModel(customModel.trim());
+                      setCustomModel('');
+                    }
+                  }}
+                  disabled={!!pulling || !customModel.trim()}
+                  className="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded text-[10px] font-bold transition-colors disabled:opacity-50"
+                >
+                  PULL
+                </button>
+             </div>
           </div>
         </div>
 

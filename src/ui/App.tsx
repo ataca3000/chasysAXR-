@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Activity, Thermometer, Cpu, AlertTriangle, Zap, CheckCircle2, RotateCcw, MonitorSmartphone, X, Wrench } from 'lucide-react';
+import { Activity, Thermometer, Cpu, AlertTriangle, Zap, CheckCircle2, RotateCcw, MonitorSmartphone, X, Wrench, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import DigitalTwin from './components/DigitalTwin';
 import { TelemetryChart } from './components/TelemetryCharts';
@@ -13,6 +13,7 @@ import { VoiceAssistant } from './components/VoiceAssistant';
 import { AssemblyLab } from './components/AssemblyLab';
 import { MobileScanner } from './components/MobileScanner';
 import { LocalModelManager } from './components/LocalModelManager';
+import { JarvisCompanion } from './components/JarvisCompanion';
 
 export default function App() {
   const isMobileScanner = window.location.search.includes('role=mobile-cam');
@@ -202,6 +203,7 @@ export default function App() {
             <NavItem active={activeView === 'predictive_maint'} onClick={() => setActiveView('predictive_maint')} icon={<RotateCcw size={18} />} label="SENSÓRICA & MONITOREO" />
             <NavItem active={activeView === 'assembly_lab'} onClick={() => setActiveView('assembly_lab')} icon={<Wrench size={18} />} label="LÍNEA DE PRODUCCIÓN" />
             <NavItem active={activeView === 'ai_models'} onClick={() => setActiveView('ai_models')} icon={<Cpu size={18} />} label="AI MODELS (LOCAL)" />
+            <NavItem active={activeView === 'jarvis_companion'} onClick={() => setActiveView('jarvis_companion')} icon={<Bot size={18} />} label="JARVIS COMPANION (3D)" />
           </nav>
 
           <div className="mt-auto relative z-10">
@@ -542,6 +544,12 @@ export default function App() {
           {activeView === 'ai_models' && (
             <div className="xl:col-span-3">
               <LocalModelManager />
+            </div>
+          )}
+
+          {activeView === 'jarvis_companion' && (
+            <div className="xl:col-span-3 h-[calc(100vh-120px)]">
+              <JarvisCompanion />
             </div>
           )}
         </div>
