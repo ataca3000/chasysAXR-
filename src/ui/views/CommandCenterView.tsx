@@ -5,6 +5,7 @@ import { TelemetryChart } from '../components/TelemetryCharts';
 import { VisionAnalyzer } from '../components/VisionAnalyzer';
 import { HardwareControl } from '../components/HardwareControl';
 import { AgentExecutor } from '../components/AgentExecutor';
+import { AgentBackendSelector } from '../components/AgentBackendSelector';
 import { ARCameraLayer } from '../components/ARCameraLayer';
 import { hardware } from '../../services/hardwareController';
 
@@ -63,6 +64,8 @@ export function CommandCenterView({
       <div className="flex flex-col gap-6 h-full">
         
         <VisionAnalyzer />
+
+        <AgentBackendSelector />
 
         <AgentExecutor currentTelemetry={currentTelemetry} />
 

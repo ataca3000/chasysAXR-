@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { executeSerialCommand } from "../drivers/webserial/manager";
 import { executeUsbCommand } from "../drivers/webusb/manager";
-import { getAgentRecommendations } from "../services/geminiService";
+import { getRecommendations } from "../services/agentBackend";
 import { useAgentStore } from "../store/state";
 
 const AgentCommandSchema = z.object({
@@ -37,7 +37,7 @@ export async function dispatchAgentCommand(
     if (parsed.type === "ai") {
       const telemetry = parsed.payload?.telemetry ?? parsed.payload;
       const machineStatus = (telemetry as any)?.status ?? "OPERATIVO";
-      return await getAgentRecommendations(telemetry, machineStatus);
+      return await getRecommendations(telemetry, machineStatus);
     }
   } finally {
     store.setStatus("idle");

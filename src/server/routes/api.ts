@@ -1,11 +1,23 @@
 import { Router } from "express";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 dotenv.config();
 
 const router = Router();
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION || process.env.VITE_AWS_REGION || 'us-east-1',
+  credentials: process.env.AWS_ACCESS_KEY_ID
+    ? {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      }
+    : undefined,
+});
 
 router.get("/health", (_req, res) => {
   res.json({ status: "ok" });
@@ -92,3 +104,18 @@ Keep your message concise, helpful, and engineering-focused.`,
 });
 
 export default router;
+
+// S3 presign endpoint (server-side). The frontend should call this to get a PUT presigned URL.
+router.post('/s3/presign', async (req, res) => {
+  try {
+    const { key, contentType, expiresIn } = req.body;
+    if (!process.env.S3_BUCKET) return res.status(400).json({ error: 'S3_BUCKET env not set' });
+
+    const cmd = new PutObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key, ContentType: contentType });
+    const url = await getSignedUrl(s3Client, cmd, { expiresIn: expiresIn || 900 });
+    res.json({ url });
+  } catch (err: any) {
+    console.error('S3 presign error:', err);
+    res.status(500).json({ error: String(err?.message || err) });
+  }
+});
