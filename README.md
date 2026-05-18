@@ -1,86 +1,60 @@
-# 🤖 Gopilot (Jarvis) Industrial
-### 🏗️ The Future of Industrial Autonomy by Brecha Industries
+# GoPilot iAgnt — Industrial AI & Digital Twin Framework
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)]()
-[![AI Powered](https://img.shields.io/badge/AI-Gemini%20%26%20Ollama-blue.svg)]()
-[![Brecha Industries](https://img.shields.io/badge/Vision-Brecha%20Industries-black.svg)]()
+![Release](https://img.shields.io/badge/release-v1.0.0-blue.svg)
+![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)
+![Platform](https://img.shields.io/badge/platform-web%20%7C%20edge%20%7C%20iot-lightgrey.svg)
 
-**Gopilot (Jarvis) Industrial** is a state-of-the-art Digital Twin & Industrial Control ecosystem. It bridges the gap between complex industrial hardware and intuitive human-centric AI control. Designed for the Next-Gen Factory, it turns operators into high-level technology conductors.
+## Visión del proyecto
+GoPilot iAgnt es un sistema industrial integral para control de hardware, agentes inteligentes y gemelos digitales 3D. El proyecto une una PWA con WebSerial/WebUSB, un motor de agentes IA y drivers de hardware industrial sobre una arquitectura modular y escalable.
 
----
+## Objetivos clave
+- Interfaz PWA para control industrial y diagnóstico.
+- Agente inteligente basado en IA y pipelines de decisiones.
+- Drivers modernos para ESP32, CNC y sensores.
+- Conectividad segura con API y Cloudflare Tunnel.
+- Gemelo digital 3D basado en Three.js.
 
-## 🌟 Vision & Mission
-> "Democratizing industrial engineering through agentic AI and immersive 3D simulation." — **Brecha Industries**
+## Estructura profesional
+- `/src`
+  - `/ui` - PWA y presentaciones React
+  - `/components` - UI atómica reutilizable
+  - `/hooks` - lógica compartida React
+  - `/agents` - inteligencia y pipeline de agentes
+  - `/drivers`
+    - `/webserial`
+    - `/webusb`
+  - `/3d` - escena y gemelo digital
+  - `/services` - API, sincronización y cloud
+  - `/store` - estado global con Zustand
+  - `/workflows` - orquestación de pipelines
+- `/public` - recursos estáticos y manifest
+- `/docs` - documentación técnica y arquitectura
+- `/tests` - pruebas unitarias e integradas
+- `/scripts` - utilidades de desarrollo y release
 
-## 🚀 Key Features
-
-### 🏢 Digital Twin Inmersivo
-*   **Real-time Rendering:** Visualiza tu maquinaria (CNC, Robots, Bandas) con sincronización milimétrica.
-*   **Assembly Lab:** Diseña layouts de planta en minutos con componentes pre-cargados (Motores, Válvulas, Sensores).
-
-### 🧠 Inteligencia Artificial Agéntica
-*   **Jarvis Core:** Integración con Gemini Pro para análisis de telemetría y diagnóstico preventivo.
-*   **Voice Construction:** Construye tu planta usando comandos de voz naturales.
-*   **Ollama Bridge:** Implementación directa de **Llama 3** y **Mistral** en local para máxima privacidad.
-
-### 🔌 Conectividad Universal
-*   **Protocolos Industriales:** Soporte para MQTT, Serial Port, y Modbus.
-*   **Phone Sync:** Usa tu móvil como escáner AR y cámara térmica secundaria mediante sincronización QR.
-
----
-
-## 🛠️ Technology Stack
-
-| Layer | Technologies |
-| :--- | :--- |
-| **Frontend** | React 19, Three.js, Vite, Framer Motion |
-| **Intelligence** | Google Gemini API, Ollama (Local LLMs), Vision API |
-| **Hardware** | Node SerialPort, WebSockets, MQTT |
-| **Styling** | Tailwind CSS (Glassmorphism UI) |
-
----
-
-## 📦 Quick Start
-
-### 1. Requirements
-- [Node.js](https://nodejs.org/) (v20+)
-- [Ollama](https://ollama.com/) (For local AI features)
-
-### 2. Installation
+## Comandos principales
 ```bash
-git clone https://github.com/ataca3000/Gopilot-INDUSTRIAL.git
-cd Gopilot-INDUSTRIAL
 npm install
-```
-
-### 3. Configuration
-Copy `.env.example` to `.env` and fill in your keys:
-```env
-VITE_GEMINI_API_KEY=your_key_here
-VITE_FIREBASE_CONFIG=your_json_here
-```
-
-### 4. Launch
-```bash
 npm run dev
+npm run build
+npm run lint
+npm run test
+npm run typecheck
 ```
 
----
+## Branch strategy
+- `main` - versión estable de producción
+- `dev` - integración continua
+- `feature/*` - nuevas funcionalidades
+- `fix/*` - correcciones de bugs
+- `release/*` - preparación de versiones
 
-## 🗺️ Roadmap
-- [ ] **Phase 1:** Multi-agent collaboration for production scheduling.
-- [ ] **Phase 2:** Advanced VR/AR support for remote maintenance.
-- [ ] **Phase 3:** Integration with industrial robotic arms (Universal Robots/KUKA).
+## Documentación importante
+- `architecture.md` — Arquitectura general
+- `roadmap.md` — Hoja de ruta del producto
+- `CHANGELOG.md` — Registro de cambios
+- `CONTRIBUTING.md` — Cómo contribuir
+- `SECURITY.md` — Seguridad y reportes
 
-## 🤝 Community & Credits
-This is a **Free Use** project under the vision of **Brecha Industries**.
-
-- **Contribute:** Open an issue or submit a PR! We're looking for 3D artists and hardware experts.
-- **Credits:** Created and maintained by the **Brecha Industries** team.
-
----
-*Transforming the industrial gap into a bridge of possibilities.*
-
----
-*Diseñado para convertir operarios en directores de orquesta tecnológica.*
+## Licencia
+MIT License
