@@ -4,6 +4,7 @@ import { CameraFeeds } from '../components/CameraFeeds';
 import { TelemetryChart } from '../components/TelemetryCharts';
 import { VisionAnalyzer } from '../components/VisionAnalyzer';
 import { HardwareControl } from '../components/HardwareControl';
+import { AgentExecutor } from '../components/AgentExecutor';
 import { ARCameraLayer } from '../components/ARCameraLayer';
 import { hardware } from '../../services/hardwareController';
 
@@ -62,6 +63,8 @@ export function CommandCenterView({
       <div className="flex flex-col gap-6 h-full">
         
         <VisionAnalyzer />
+
+        <AgentExecutor currentTelemetry={currentTelemetry} />
 
         {/* Real-time Dials */}
         <div className="glass-panel p-5 shrink-0">
