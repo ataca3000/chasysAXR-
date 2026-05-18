@@ -6,6 +6,7 @@ import { VisionAnalyzer } from '../components/VisionAnalyzer';
 import { HardwareControl } from '../components/HardwareControl';
 import { AgentExecutor } from '../components/AgentExecutor';
 import { AgentBackendSelector } from '../components/AgentBackendSelector';
+import { S3Uploader } from '../components/S3Uploader';
 import { ARCameraLayer } from '../components/ARCameraLayer';
 import { hardware } from '../../services/hardwareController';
 
@@ -66,6 +67,8 @@ export function CommandCenterView({
         <VisionAnalyzer />
 
         <AgentBackendSelector />
+
+        <S3Uploader />
 
         <AgentExecutor currentTelemetry={currentTelemetry} />
 
