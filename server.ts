@@ -2,10 +2,8 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { createProxyMiddleware } from "http-proxy-middleware";
-import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
-
-import dotenv from "dotenv";
+import session from "express-session";
 import apiRoutes from "./src/server/routes/api";
 
 async function startServer() {
@@ -13,6 +11,16 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+
+  // Session middleware for auth flows
+  app.use(
+    session({
+      secret: process.env.SESSION_SECRET || "dev_secret_change_me",
+      resave: false,
+      saveUninitialized: false,
+      cookie: { secure: false },
+    })
+  );
 
   // Mount API routes
   app.use("/api", apiRoutes);

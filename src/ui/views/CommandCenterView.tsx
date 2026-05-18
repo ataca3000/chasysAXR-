@@ -7,6 +7,7 @@ import { HardwareControl } from '../components/HardwareControl';
 import { AgentExecutor } from '../components/AgentExecutor';
 import { AgentBackendSelector } from '../components/AgentBackendSelector';
 import { S3Uploader } from '../components/S3Uploader';
+import { LoginPanel } from '../components/LoginPanel';
 import { ARCameraLayer } from '../components/ARCameraLayer';
 import { hardware } from '../../services/hardwareController';
 
@@ -67,6 +68,8 @@ export function CommandCenterView({
         <VisionAnalyzer />
 
         <AgentBackendSelector />
+
+        <LoginPanel />
 
         <S3Uploader />
 

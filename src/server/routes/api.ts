@@ -3,6 +3,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import axios from 'axios';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 
 dotenv.config();
 
@@ -118,4 +121,124 @@ router.post('/s3/presign', async (req, res) => {
     console.error('S3 presign error:', err);
     res.status(500).json({ error: String(err?.message || err) });
   }
+});
+
+// --- Authentication routes: Google, GitHub, magic-email ---
+// Note: session middleware must be applied in server.ts so `req.session` is available.
+
+// Magic link: request a token emailed to the user (development: token logged)
+router.post('/auth/magic', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'email required' });
+
+  const token = crypto.randomBytes(24).toString('hex');
+  const expires = Date.now() + 15 * 60 * 1000; // 15 min
+
+  // store in session for demo; production should persist
+  (req as any).session.magic = { email, token, expires };
+
+  const link = `${req.protocol}://${req.get('host')}/api/auth/magic/verify?token=${token}`;
+
+  // Try to send email if SMTP configured, otherwise log link
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT || 587),
+        secure: false,
+        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      });
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to: email,
+        subject: 'Your GoPilot magic login link',
+        text: `Use this link to login: ${link}`,
+      });
+    } catch (err) {
+      console.error('Email send failed:', err);
+    }
+  } else {
+    console.log('Magic login link (dev):', link);
+  }
+
+  res.json({ ok: true });
+});
+
+router.get('/auth/magic/verify', (req, res) => {
+  const { token } = req.query;
+  const sess = (req as any).session?.magic;
+  if (!sess || !token) return res.status(400).send('Invalid or expired token');
+  if (sess.token !== token || Date.now() > sess.expires) return res.status(400).send('Invalid or expired token');
+
+  // create session user
+  (req as any).session.user = { provider: 'magic', email: sess.email };
+  delete (req as any).session.magic;
+
+  // redirect to app root
+  res.redirect('/');
+});
+
+// Google OAuth start
+router.get('/auth/google', (_req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const redirect = `${_req.protocol}://${_req.get('host')}/api/auth/google/callback`;
+  const scope = encodeURIComponent('openid email profile');
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
+  res.redirect(url);
+});
+
+router.get('/auth/google/callback', async (req, res) => {
+  try {
+    const code = req.query.code as string;
+    const tokenRes = await axios.post('https://oauth2.googleapis.com/token', new URLSearchParams({
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID || '',
+      client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+      redirect_uri: `${req.protocol}://${req.get('host')}/api/auth/google/callback`,
+      grant_type: 'authorization_code'
+    }).toString(), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+
+    const accessToken = tokenRes.data.access_token;
+    const userRes = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { Authorization: `Bearer ${accessToken}` } });
+    const user = userRes.data;
+    (req as any).session.user = { provider: 'google', email: user.email, name: user.name };
+    res.redirect('/');
+  } catch (err) {
+    console.error('Google OAuth error', err);
+    res.status(500).send('Authentication failed');
+  }
+});
+
+// GitHub OAuth start
+router.get('/auth/github', (req, res) => {
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  const redirect = `${req.protocol}://${req.get('host')}/api/auth/github/callback`;
+  const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirect)}&scope=user:email`;
+  res.redirect(url);
+});
+
+router.get('/auth/github/callback', async (req, res) => {
+  try {
+    const code = req.query.code as string;
+    const tokenRes = await axios.post('https://github.com/login/oauth/access_token', {
+      client_id: process.env.GITHUB_CLIENT_ID,
+      client_secret: process.env.GITHUB_CLIENT_SECRET,
+      code,
+    }, { headers: { Accept: 'application/json' } });
+
+    const accessToken = tokenRes.data.access_token;
+    const userRes = await axios.get('https://api.github.com/user', { headers: { Authorization: `Bearer ${accessToken}` } });
+    const emailsRes = await axios.get('https://api.github.com/user/emails', { headers: { Authorization: `Bearer ${accessToken}` } });
+    const primaryEmail = (emailsRes.data || []).find((e: any) => e.primary)?.email || (emailsRes.data[0]?.email);
+    (req as any).session.user = { provider: 'github', email: primaryEmail, name: userRes.data.name || userRes.data.login };
+    res.redirect('/');
+  } catch (err) {
+    console.error('GitHub OAuth error', err);
+    res.status(500).send('Authentication failed');
+  }
+});
+
+// Simple route to get current session user
+router.get('/auth/me', (req, res) => {
+  res.json({ user: (req as any).session.user || null });
 });
