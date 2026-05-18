@@ -1,19 +1,19 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { Activity, Thermometer, Cpu, AlertTriangle, Zap, CheckCircle2, RotateCcw, MonitorSmartphone, X, Wrench, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import DigitalTwin from './components/DigitalTwin';
 import { getAgentRecommendations } from '../services/geminiService';
 import { ARCameraLayer } from './components/ARCameraLayer';
-import { hardware } from '../services/hardwareController';
 import { VoiceAssistant } from './components/VoiceAssistant';
 import { AssemblyLab } from './components/AssemblyLab';
 import { MobileScanner } from './components/MobileScanner';
 import { LocalModelManager } from './components/LocalModelManager';
+import DigitalTwin from './components/DigitalTwin';
 import { JarvisCompanion } from './components/JarvisCompanion';
 import { CommandCenterView } from './views/CommandCenterView';
 import { ThermalImagingView } from './views/ThermalImagingView';
 import { PlasmaCuttingView } from './views/PlasmaCuttingView';
 import { PredictiveMaintenanceView } from './views/PredictiveMaintenanceView';
+import { useTelemetry, telemetryStore } from '../store/telemetryStore';
 
 export default function App() {
   const isMobileScanner = window.location.search.includes('role=mobile-cam');
@@ -21,13 +21,11 @@ export default function App() {
     return <MobileScanner />;
   }
 
-  const [telemetryHistory, setTelemetryHistory] = useState<any[]>([]);
-  const [currentTelemetry, setCurrentTelemetry] = useState({ temperature: 300, vibration: 1.2, load: 45 });
+  const { currentTelemetry, telemetryHistory, isCriticalAlarm, systemError } = useTelemetry();
   const [aiInsights, setAiInsights] = useState<{html: string, gcode: string[]} | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
   const [arModeActive, setArModeActive] = useState(false);
   const [kioskMode, setKioskMode] = useState(false);
-  const [systemError, setSystemError] = useState<string | null>(null);
   const [enabledSensors, setEnabledSensors] = useState<string[]>(['thermal', 'vibration', 'load']);
 
   const toggleSensorLibrary = (sensor: string) => {
@@ -56,88 +54,19 @@ export default function App() {
 
   const [activeView, setActiveView] = useState('command_center');
 
-  const [isCriticalAlarm, setIsCriticalAlarm] = useState(false);
-  const lastHardwareUpdateRef = useRef<number>(0);
-
-  const watchdogRef = useRef<number | null>(null);
-
-  // Hook real-time events from hardware to React State
-  useEffect(() => {
-    hardware.onSensorData = (data) => {
-      lastHardwareUpdateRef.current = Date.now();
-      setIsCriticalAlarm(false); // Clear disconnected state if we get data
-      
-      const newTemp = data.temp !== undefined ? data.temp : data.temperature;
-      const newVib = data.vib !== undefined ? data.vib : data.vibration;
-      const newLoad = data.load !== undefined ? data.load : undefined;
-
-      if (newTemp !== undefined || newVib !== undefined || newLoad !== undefined) {
-         setCurrentTelemetry(prev => ({
-           temperature: newTemp !== undefined ? newTemp : prev.temperature,
-           vibration: newVib !== undefined ? newVib : prev.vibration,
-           load: newLoad !== undefined ? newLoad : prev.load
-         }));
-      }
-    };
-    
-    hardware.onError = (errText) => {
-      setSystemError(`Hardware Error: ${errText}`);
-    };
-
-    // Watchdog timer: If hardware connected but no data for 5 seconds, trigger critical alarm
-    watchdogRef.current = window.setInterval(() => {
-      if (lastHardwareUpdateRef.current > 0 && Date.now() - lastHardwareUpdateRef.current > 5000) {
-         setIsCriticalAlarm(true);
-      }
-    }, 1000);
-
-    return () => {
-       if (watchdogRef.current) clearInterval(watchdogRef.current);
-    }
-  }, []);
-
   const isCritical = isCriticalAlarm || currentTelemetry.temperature > 800 || currentTelemetry.vibration > 5 || currentTelemetry.load > 85;
 
-  // We removed the local `setInterval` simulator so we can rely purely on the hardware Controller for telemetry.
-  // This satisfies the "replace the current simulated data" requirement.
-  
-  // Make sure we have some initial telemetry history to prevent crash.
-  useEffect(() => {
-    const initialData = Array.from({ length: 20 }).map((_, i) => ({
-      time: i.toString(),
-      temperature: 300,
-      vibration: 1,
-      load: 40
-    }));
-    setTelemetryHistory(initialData);
-  }, []);
-
-  // Update history based on currentTelemetry changes (so both simulator and hardware populate history)
-  useEffect(() => {
-    let timeRaw = new Date().getTime();
-    setTelemetryHistory(prev => {
-      const newPoint = {
-        time: timeRaw.toString().slice(-6), 
-        temperature: currentTelemetry.temperature,
-        vibration: currentTelemetry.vibration,
-        load: currentTelemetry.load
-      };
-      const newData = [...prev, newPoint];
-      if (newData.length > 20) newData.shift();
-      return newData;
-    });
-  }, [currentTelemetry]);
 
 
   const fetchAiAnalysis = async () => {
     setLoadingAi(true);
-    setSystemError(null);
+    telemetryStore.setSystemError(null);
     try {
       const status = currentTelemetry.temperature > 800 ? "ALERTA CRÍTICA" : "NORMAL";
       const insights = await getAgentRecommendations(currentTelemetry, status);
       setAiInsights(insights);
     } catch (err: any) {
-      setSystemError(err.message || 'Error occurred while contacting Gemini AI.');
+      telemetryStore.setSystemError(err.message || 'Error occurred while contacting Gemini AI.');
       setAiInsights({ html: '<p class="text-rose-600">Analysis failed due to connection error. Please try again.</p>', gcode: [] });
     } finally {
       setLoadingAi(false);
@@ -162,7 +91,7 @@ export default function App() {
                 <p className="text-sm font-mono mt-1 opacity-90">{systemError}</p>
               </div>
               <button 
-                onClick={() => setSystemError(null)} 
+                onClick={() => telemetryStore.setSystemError(null)} 
                 className="text-rose-400 hover:text-rose-600 transition-colors p-1"
                 title="Dismiss"
               >
@@ -369,7 +298,7 @@ export default function App() {
         </div>
       </main>
       )}
-      <VoiceAssistant onError={(msg) => setSystemError(msg)} />
+      <VoiceAssistant onError={(msg: string) => telemetryStore.setSystemError(msg)} />
     </div>
   );
 }
