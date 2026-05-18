@@ -2,11 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Activity, Thermometer, Cpu, AlertTriangle, Zap, CheckCircle2, RotateCcw, MonitorSmartphone, X, Wrench, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import DigitalTwin from './components/DigitalTwin';
-import { TelemetryChart } from './components/TelemetryCharts';
 import { getAgentRecommendations } from '../services/geminiService';
-import { CameraFeeds } from './components/CameraFeeds';
-import { HardwareControl } from './components/HardwareControl';
-import { VisionAnalyzer } from './components/VisionAnalyzer';
 import { ARCameraLayer } from './components/ARCameraLayer';
 import { hardware } from '../services/hardwareController';
 import { VoiceAssistant } from './components/VoiceAssistant';
@@ -14,6 +10,10 @@ import { AssemblyLab } from './components/AssemblyLab';
 import { MobileScanner } from './components/MobileScanner';
 import { LocalModelManager } from './components/LocalModelManager';
 import { JarvisCompanion } from './components/JarvisCompanion';
+import { CommandCenterView } from './views/CommandCenterView';
+import { ThermalImagingView } from './views/ThermalImagingView';
+import { PlasmaCuttingView } from './views/PlasmaCuttingView';
+import { PredictiveMaintenanceView } from './views/PredictiveMaintenanceView';
 
 export default function App() {
   const isMobileScanner = window.location.search.includes('role=mobile-cam');
@@ -329,212 +329,26 @@ export default function App() {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 flex-1 min-h-0">
           
           {activeView === 'command_center' && (
-            <div className="xl:col-span-3 grid grid-cols-1 xl:grid-cols-3 gap-6 h-full">
-              {/* Main Visualizer (3D Digital Twin) */}
-              <div className="xl:col-span-2 flex flex-col gap-6 h-full">
-                <div className="flex-1 glass-panel !bg-[#ebda88] !border-dotted !rounded-[20px] !border-[#17ddee] relative min-h-[300px] md:min-h-[400px]">
-                  
-                  {/* Jarvis AR HUD & Multi-Camera */}
-                  <ARCameraLayer isActive={arModeActive} />
-                  
-                  <div className="absolute inset-0 z-20 pointer-events-auto">
-                    <DigitalTwin telemetry={currentTelemetry} arMode={arModeActive} history={telemetryHistory} enabledSensors={enabledSensors} />
-                  </div>
-                </div>
-
-                {/* Cameras Feed Panel */}
-                <CameraFeeds telemetry={currentTelemetry} />
-
-                {/* Metrics */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
-                  <TelemetryChart 
-                    data={telemetryHistory} 
-                    dataKey="temperature" 
-                    color={currentTelemetry.temperature > 800 ? "#e11d48" : "#94a3b8"} 
-                    label="SENSOR ADAPTATIVO 1" 
-                  />
-                  <TelemetryChart 
-                    data={telemetryHistory} 
-                    dataKey="vibration" 
-                    color={currentTelemetry.vibration > 5 ? "#e11d48" : "#94a3b8"} 
-                    label="SENSOR ADAPTATIVO 2" 
-                  />
-                </div>
-              </div>
-
-              {/* AI Panel & Logs */}
-              <div className="flex flex-col gap-6 h-full">
-                
-                <VisionAnalyzer />
-
-                {/* Real-time Dials */}
-                <div className="glass-panel p-5 shrink-0">
-                  <h3 className="text-[10px] text-google-blue font-mono font-bold tracking-widest mb-4 flex items-center gap-2 uppercase">
-                    <Activity size={14} /> REAL-TIME TELEMETRY
-                  </h3>
-                  
-                  <div className="space-y-5">
-                    <MetricBar label="CARGA OPERACIONAL" value={currentTelemetry.load} max={100} unit="%" color="bg-google-blue" />
-                    <MetricBar label="NIVEL TERMICO" value={currentTelemetry.temperature} max={1000} unit=" °C" color={currentTelemetry.temperature > 800 ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]" : "bg-orange-500"} />
-                    <MetricBar label="NIVEL ACÚSTICO/VIBRACIÓN" value={currentTelemetry.vibration} max={10} unit="" color={currentTelemetry.vibration > 5 ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]" : "bg-cyan-500"} />
-                  </div>
-                </div>
-
-                {/* Serial Hardware Port Control */}
-                <div className="h-64">
-                   <HardwareControl />
-                </div>
-
-                {/* AI Agent Analysis */}
-                <div className="glass-panel !bg-[#ffffff] !border-0 p-5 flex-1 flex flex-col min-h-[250px] border-t-2 border-t-google-blue">
-                  <h3 className="text-sm text-white font-bold mb-4 flex items-center gap-2 shrink-0">
-                    <Cpu size={16} className="text-google-blue" /> GEMINI AI COMMAND ASSOCIATE
-                  </h3>
-                  
-                  <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar text-sm text-slate-300 leading-relaxed">
-                    {loadingAi ? (
-                      <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-4">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-google-blue"></div>
-                        <p className="font-mono text-xs">Evaluando requerimientos sensoriales y de operación...</p>
-                      </div>
-                    ) : aiInsights ? (
-                      <div className="flex flex-col h-full">
-                         <div className="prose prose-invert prose-sm max-w-none text-slate-200 mb-4" dangerouslySetInnerHTML={{ __html: aiInsights.html }} />
-                         {aiInsights.gcode && aiInsights.gcode.length > 0 && (
-                            <div className="mt-auto bg-black border border-white/10 rounded-lg p-3 shrink-0 shadow-inner">
-                               <h4 className="text-[10px] text-google-blue font-mono font-bold tracking-widest mb-2 flex items-center"><Zap size={12} className="mr-1" /> RECOMENDACIÓN SECUENCIA IA</h4>
-                               <div className="bg-black/60 text-google-green font-mono text-xs p-2 rounded mb-3 overflow-x-auto">
-                                  {aiInsights.gcode.map((g, i) => <div key={i}>{g}</div>)}
-                               </div>
-                               <button 
-                                 onClick={async (e) => {
-                                    const btn = e.currentTarget;
-                                    const oldHtml = btn.innerHTML;
-                                    btn.disabled = true;
-                                    btn.innerHTML = 'EJECUTANDO...';
-                                    btn.classList.add('opacity-75', 'cursor-not-allowed');
-                                    
-                                    for (const cmd of aiInsights.gcode) {
-                                       await hardware.sendCommand(cmd);
-                                       await new Promise(r => setTimeout(r, 600));
-                                    }
-                                    
-                                    btn.innerHTML = '¡COMPLETADO!';
-                                    btn.classList.replace('bg-google-blue', 'bg-google-green');
-                                    btn.classList.replace('hover:bg-blue-600', 'hover:bg-green-600');
-                                    
-                                    setTimeout(() => {
-                                       btn.innerHTML = oldHtml;
-                                       btn.disabled = false;
-                                       btn.classList.remove('opacity-75', 'cursor-not-allowed');
-                                       btn.classList.replace('bg-google-green', 'bg-google-blue');
-                                       btn.classList.replace('hover:bg-green-600', 'hover:bg-blue-600');
-                                    }, 2000);
-                                 }}
-                                 className="w-full bg-google-blue hover:bg-blue-600 text-white text-[10px] font-bold font-mono tracking-widest py-2 rounded transition-colors flex items-center justify-center">
-                                 <Cpu size={14} className="mr-2" /> EJECUTAR EN MÁQUINA
-                               </button>
-                            </div>
-                         )}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-slate-300 text-center px-4">
-                        <Cpu className="w-12 h-12 mb-3 opacity-50" />
-                        <p>Agent is standing by. Request an analysis for proactive line evaluation.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <CommandCenterView 
+              arModeActive={arModeActive}
+              currentTelemetry={currentTelemetry}
+              telemetryHistory={telemetryHistory}
+              enabledSensors={enabledSensors}
+              loadingAi={loadingAi}
+              aiInsights={aiInsights}
+            />
           )}
 
           {activeView === 'thermal_imaging' && (
-            <div className="xl:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
-              <div className="glass-panel p-6 flex flex-col items-center justify-center relative bg-black/60">
-                 <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-rose-900/40 via-transparent to-transparent animate-pulse"></div>
-                 <Thermometer size={64} className="mb-4 text-rose-500 drop-shadow-[0_0_15px_rgba(244,63,94,0.4)]" />
-                 <h2 className="text-2xl font-display text-white font-bold tracking-widest mb-2 z-10 uppercase">THERMAL CORTEX INITIALIZING</h2>
-                 <p className="text-slate-400 text-sm max-w-md text-center z-10 font-mono">Calibrating infrared sensor array. Establishing handshake with Modbus thermal probes. Waiting for environmental baseline...</p>
-                 <div className="w-full max-w-sm h-1 bg-white/10 mt-6 rounded overflow-hidden">
-                    <div className="h-full bg-rose-500 animate-[pulse_2s_ease-in-out_infinite] shadow-[0_0_10px_rgba(244,63,94,0.8)]" style={{width: '60%'}}></div>
-                 </div>
-              </div>
-              <div className="glass-panel p-6 relative">
-                 <h3 className="text-google-blue font-mono text-[10px] uppercase font-bold tracking-widest mb-6 border-b border-white/10 pb-3">THERMAL ZONES STATUS</h3>
-                 <div className="space-y-5 font-mono text-xs">
-                    <div className="flex justify-between items-center p-3 rounded bg-white/5 border border-white/5"><span className="text-slate-300">SPINDLE CASING</span><span className="text-rose-500 font-bold animate-pulse text-sm shadow-[0_0_15px_rgba(244,63,94,0.2)]">842 °C</span></div>
-                    <div className="flex justify-between items-center p-3 rounded bg-white/5 border border-white/5"><span className="text-slate-300">Z-AXIS MOTORS</span><span className="text-orange-500 text-sm font-bold">145 °C</span></div>
-                    <div className="flex justify-between items-center p-3 rounded bg-white/5 border border-white/5"><span className="text-slate-300">COOLANT RESERVOIR</span><span className="text-cyan-500 text-sm font-bold">42 °C</span></div>
-                    <div className="flex justify-between items-center p-3 rounded bg-white/5 border border-white/5"><span className="text-slate-300">POWER SUPPLY UNIT</span><span className="text-emerald-500 text-sm font-bold">55 °C</span></div>
-                 </div>
-              </div>
-            </div>
+            <ThermalImagingView />
           )}
 
           {activeView === 'plasma_cutting' && (
-            <div className="xl:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
-              <div className="glass-panel p-6 flex flex-col items-center justify-center relative bg-black/60 border-yellow-500/20">
-                 <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-900/20 via-transparent to-transparent animate-pulse"></div>
-                 <Zap size={64} className="mb-4 text-yellow-500 animate-[pulse_0.5s_infinite] drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
-                 <h2 className="text-2xl font-display text-yellow-500 font-bold tracking-widest mb-2 z-10 uppercase">PLASMA IGNITION OFFLINE</h2>
-                 <p className="text-slate-400 text-sm max-w-md text-center z-10 font-mono">Gas pressure below operational threshold. Please check argon/nitrogen mix supply lines. Safety interlock engaged.</p>
-                 <button className="mt-8 border border-yellow-500/50 hover:border-yellow-400 bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 px-6 py-3 rounded-lg font-display text-sm tracking-widest font-bold transition-all shadow-[0_0_10px_rgba(234,179,8,0.2)]">OVERRIDE INTERLOCK</button>
-              </div>
-              <div className="glass-panel p-6">
-                 <h3 className="text-yellow-500 font-mono text-[10px] tracking-widest font-bold mb-6 border-b border-white/10 pb-3 uppercase">PLASMA PARAMETERS</h3>
-                 <div className="space-y-6">
-                    <div>
-                      <div className="flex justify-between text-xs text-slate-400 mb-2 font-mono"><span>CURRENT (A)</span><span className="text-slate-200">0 / 120 A</span></div>
-                      <div className="h-1 bg-white/10 rounded"><div className="h-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.8)]" style={{width: '0%'}}></div></div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-xs text-slate-400 mb-2 font-mono"><span>GAS PRESSURE</span><span className="text-slate-200">12 / 85 PSI</span></div>
-                      <div className="h-1 bg-white/10 rounded"><div className="h-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]" style={{width: '14%'}}></div></div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-xs text-slate-400 mb-2 font-mono"><span>WATER SHIELD FLOW</span><span className="text-slate-200">OFF</span></div>
-                      <div className="h-1 bg-white/10 rounded"><div className="h-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]" style={{width: '0%'}}></div></div>
-                    </div>
-                 </div>
-              </div>
-            </div>
+            <PlasmaCuttingView />
           )}
 
           {activeView === 'predictive_maint' && (
-            <div className="xl:col-span-3 flex flex-col h-full glass-panel p-6">
-              <div className="flex items-center gap-4 mb-6 border-b border-white/10 pb-4">
-                <RotateCcw size={36} className="text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]" />
-                <div>
-                  <h2 className="text-2xl font-display text-white font-bold tracking-widest uppercase">PREDICTIVE MAINTENANCE AI</h2>
-                  <p className="text-slate-400 text-xs font-mono">Powered by Ultron LLM Analysis</p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono text-xs flex-1">
-                 <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-5 flex flex-col shadow-[0_0_15px_rgba(244,63,94,0.1)] relative overflow-hidden">
-                   <div className="absolute top-0 right-0 w-16 h-16 bg-rose-500/20 blur-2xl"></div>
-                   <div className="text-rose-400 font-bold tracking-widest mb-3 flex items-center gap-1"><AlertTriangle size={14}/> URGENT</div>
-                   <div className="text-white text-lg font-display mb-1 font-bold">SPINDLE BEARINGS</div>
-                   <div className="text-slate-300 mb-4 mt-auto leading-relaxed">Vibration signature indicates 92% probability of failure in next 48h.</div>
-                   <button className="w-full mt-2 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/50 text-rose-400 font-bold py-2.5 rounded transition-all">ORDER REPLACEMENT</button>
-                 </div>
-                 
-                 <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-5 flex flex-col relative overflow-hidden">
-                   <div className="text-orange-400 font-bold tracking-widest mb-3">WARNING</div>
-                   <div className="text-white text-lg font-display mb-1 font-bold">X-AXIS LEAD SCREW</div>
-                   <div className="text-slate-300 mb-4 mt-auto leading-relaxed">Lubrication viscosity low. Backlash increased by 0.02mm over last 100 cycles.</div>
-                   <button className="w-full mt-2 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 text-orange-400 font-bold py-2.5 rounded transition-all">SCHEDULE LUBE</button>
-                 </div>
-
-                 <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-5 flex flex-col relative overflow-hidden">
-                   <div className="text-emerald-400 font-bold tracking-widest mb-3">OPTIMAL</div>
-                   <div className="text-white text-lg font-display mb-1 font-bold">Y/Z ACTUATORS</div>
-                   <div className="text-slate-300 mb-4 mt-auto leading-relaxed">Operating within normal parameters. Estimated remaining life: 14,000h.</div>
-                   <div className="mt-2 text-center text-emerald-400 font-bold bg-emerald-500/20 py-2.5 rounded border border-emerald-500/30">NO ACTION REQUIRED</div>
-                 </div>
-              </div>
-            </div>
+            <PredictiveMaintenanceView />
           )}
 
           {activeView === 'assembly_lab' && (
@@ -574,23 +388,6 @@ function NavItem({ icon, label, active = false, onClick }: { icon: React.ReactNo
   );
 }
 
-function MetricBar({ label, value, max, unit, color }: { label: string, value: number, max: number, unit: string, color: string }) {
-  const percentage = Math.min(100, Math.max(0, (value / max) * 100));
-  return (
-    <div>
-      <div className="flex justify-between text-xs mb-1 font-mono uppercase tracking-wider">
-        <span className="text-slate-400">{label}</span>
-        <span className="text-slate-200 font-bold">{value.toFixed(1)}{unit}</span>
-      </div>
-      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-        <div 
-          className={`h-full ${color} transition-all duration-300 ease-out`} 
-          style={{ width: `${percentage}%` }} 
-        />
-      </div>
-    </div>
-  );
-}
 
 function KioskMetric({ label, value, max, unit, isCritical }: { label: string, value: number, max: number, unit: string, isCritical: boolean }) {
   const percentage = Math.min(100, Math.max(0, (value / max) * 100));
