@@ -31,7 +31,7 @@ const CustomModel = ({ url, fileExt }: { url: string; fileExt: string }) => {
   }
 };
 
-const MachineNode = ({ id, index, position, type, url, fileExt, images, isSelected, _connectMode, isValidTarget, isInvalidTarget, onNodeClick, onRemove }: { id: string, index: number, position: [number, number, number], type: string, url?: string, fileExt?: string, images?: string[], isSelected?: boolean, connectMode?: boolean, isValidTarget?: boolean, isInvalidTarget?: boolean, onNodeClick?: (id: string) => void, onRemove: () => void }) => {
+const MachineNode = ({ id, index, position, type, url, fileExt, images, isSelected, isValidTarget, isInvalidTarget, onNodeClick, onRemove }: { id: string, index: number, position: [number, number, number], type: string, url?: string, fileExt?: string, images?: string[], isSelected?: boolean, isValidTarget?: boolean, isInvalidTarget?: boolean, onNodeClick?: (id: string) => void, onRemove: () => void }) => {
   return (
     <group 
       position={position}
@@ -513,7 +513,6 @@ export function AssemblyLab() {
               fileExt={m.fileExt} 
               images={m.images}
               isSelected={selectedNodeId === m.id}
-              connectMode={connectMode}
               isValidTarget={isValidTarget}
               isInvalidTarget={isInvalidTarget}
               onNodeClick={(id) => {

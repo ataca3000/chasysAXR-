@@ -1,17 +1,27 @@
 import mqtt from 'mqtt';
 
+export interface TelemetryData {
+  temp?: number;
+  temperature?: number;
+  vib?: number;
+  vibration?: number;
+  load?: number;
+  flow?: number;
+  [key: string]: any; // Allow other parsed JSON fields
+}
+
 export class HardwareController {
   private port: any | null = null;
   private writer: WritableStreamDefaultWriter<string> | null = null;
   private ws: WebSocket | null = null;
   private mqttClient: mqtt.MqttClient | null = null;
 
-  private sensorListeners: Set<(data: any) => void> = new Set();
+  private sensorListeners: Set<(data: TelemetryData) => void> = new Set();
   private rawDataListeners: Set<(data: string) => void> = new Set();
-  onSensorData: ((data: any) => void) | null = null;
+  onSensorData: ((data: TelemetryData) => void) | null = null;
   onError: ((error: string) => void) | null = null;
 
-  addSensorListener(cb: (data: any) => void) {
+  addSensorListener(cb: (data: TelemetryData) => void) {
     this.sensorListeners.add(cb);
     return () => {
       this.sensorListeners.delete(cb);
@@ -25,7 +35,7 @@ export class HardwareController {
     };
   }
 
-  emitSensorData(data: any) {
+  emitSensorData(data: TelemetryData) {
     if (this.onSensorData) this.onSensorData(data);
     this.sensorListeners.forEach(cb => cb(data));
   }
@@ -135,7 +145,6 @@ export class HardwareController {
     const textDecoder = new TextDecoderStream();
     this.port.readable.pipeTo(textDecoder.writable);
     const reader = textDecoder.readable.getReader();
-    this.reader = reader;
 
     let buffer = '';
 

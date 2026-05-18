@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { hardware } from '../../services/hardwareController';
-import { Play, Square, AlertOctagon, Terminal, Cpu, Settings2, Power, Droplets, Wind, Zap, Blocks, Bot, Search, PlusCircle, Download } from 'lucide-react';
+import { Play, Square, AlertOctagon, Terminal, Cpu, Settings2, Power, Droplets, Wind, Blocks, Bot, Search, PlusCircle, Download } from 'lucide-react';
 import { ArduinoFirmwareDialog } from './ArduinoFirmwareDialog';
 
 export function HardwareControl() {

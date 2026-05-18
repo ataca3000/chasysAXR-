@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Activity, Thermometer, Cpu, AlertTriangle, Zap, CheckCircle2, RotateCcw, MonitorSmartphone, X, Wrench, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import DigitalTwin from './components/DigitalTwin';

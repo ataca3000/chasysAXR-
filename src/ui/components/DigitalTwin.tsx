@@ -65,7 +65,7 @@ function Tooltip({ position, text, status, value, unit, history, dataKey, color,
   );
 }
 
-export function CustomCNC({ position, _status, label, telemetry, arMode, history, enabledSensors = [] }: any) {
+export function CustomCNC({ position, label, telemetry, arMode, history, enabledSensors = [] }: any) {
   const isCriticalVib = telemetry?.vibration > 5;
 
   // Sensor absence checks

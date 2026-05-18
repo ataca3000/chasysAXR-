@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const ai = new GoogleGenAI(process.env.GEMINI_API_KEY || "");
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 async function startServer() {
   const app = express();
@@ -16,12 +16,12 @@ async function startServer() {
   app.use(express.json());
 
   // API endpoints
-  app.get("/api/health", (req, res) => {
+  app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });
   });
 
   // Endpoint to get the local network IP so the QR code can use it instead of localhost
-  app.get("/api/network-info", (req, res) => {
+  app.get("/api/network-info", (_req, res) => {
     const { networkInterfaces } = require('os');
     const nets = networkInterfaces();
     let localIp = '';
@@ -49,14 +49,14 @@ async function startServer() {
       '^/api/gemini': '',
     },
     on: {
-      proxyReq: (proxyReq, req, res) => {
+      proxyReq: (proxyReq) => {
         // Add API key header for standard requests
         const apiKey = process.env.GEMINI_API_KEY;
         if (apiKey) {
           proxyReq.setHeader('x-goog-api-key', apiKey);
         }
       },
-      proxyReqWs: (proxyReqWs, req, socket, options, head) => {
+      proxyReqWs: (proxyReqWs) => {
         const apiKey = process.env.GEMINI_API_KEY;
         if (apiKey) {
           proxyReqWs.setHeader('x-goog-api-key', apiKey);
@@ -66,7 +66,7 @@ async function startServer() {
   });
 
   // Intercept the URL to add the key as a query param for WebSockets since browsers can't set WS headers
-  const geminiInterceptor = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const geminiInterceptor = (req: express.Request, _res: express.Response, next: express.NextFunction) => {
     const apiKey = process.env.GEMINI_API_KEY || '';
     if (req.url.includes('key=DUMMY_KEY')) {
       req.url = req.url.replace('key=DUMMY_KEY', `key=${apiKey}`);
@@ -101,11 +101,8 @@ async function startServer() {
     try {
       const { prompt, history, currentScene } = req.body;
 
-      const model = ai.getGenerativeModel({
-        model: "gemini-2.0-flash", // Using a stable model name
-      });
-
-      const response = await model.generateContent({
+      const response = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
         contents: [{ role: 'user', parts: [{ text: `User Prompt: ${prompt}
         
 HISTORY:
@@ -114,7 +111,7 @@ ${JSON.stringify(history)}
 CURRENT SCENE STATE:
 ${JSON.stringify(currentScene)}
 ` }] }],
-        generationConfig: {
+        config: {
           systemInstruction: `You are Jarvis, a collaborative engineering and design companion focused on 3D prototyping and product creation.
 The user will give you instructions to create or modify a 3D scene.
 Your primary role is to interpret the user's creative requests and return a JSON object that strictly adheres to the schema.
@@ -155,7 +152,7 @@ Keep your message concise, helpful, and engineering-focused.`,
         },
       });
 
-      res.json({ result: JSON.parse(response.response.text() || "{}") });
+      res.json({ result: JSON.parse(response.text || "{}") });
     } catch (error) {
       console.error("Gemini API Error:", error);
       res.status(500).json({ error: "Failed to process request." });
@@ -173,7 +170,7 @@ Keep your message concise, helpful, and engineering-focused.`,
     // Serve production files
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

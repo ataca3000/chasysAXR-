@@ -3,7 +3,7 @@ import { Scan, Target, Smartphone, Crosshair } from 'lucide-react';
 
 export function JarvisAR() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  // devices were removed
   const [activeFeeds, setActiveFeeds] = useState<MediaStream[]>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -15,7 +15,7 @@ export function JarvisAR() {
     // 1. Obtener múltiples cámaras físicas (AR/C4 Mode)
     navigator.mediaDevices.enumerateDevices().then(deviceInfos => {
       const videoDevices = deviceInfos.filter(d => d.kind === 'videoinput');
-      setDevices(videoDevices);
+      // Devices no longer set to state
       
       // Pedir streams para todas las cámaras disponibles (hasta 4)
       const feedPromises = videoDevices.slice(0, 4).map(device => 

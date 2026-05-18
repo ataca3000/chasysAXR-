@@ -1,7 +1,7 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows, Grid } from "@react-three/drei";
 import { useState, useRef, useEffect } from "react";
-import { Send, Terminal, Loader2, Bot, User, Settings, Mic, MicOff, Volume2, VolumeX, Database, X } from "lucide-react";
+import { Send, Loader2, Settings, Mic, MicOff, Volume2, VolumeX, Database, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface ShapeData {
