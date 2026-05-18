@@ -42,6 +42,17 @@ npm run test
 npm run typecheck
 ```
 
+## Agente y backend AI
+- Por defecto el sistema usa Google Gemini en la nube para razonamiento de alto alcance.
+- Se soporta backend local opcional mediante Ollama/Mistral, preservando privacidad y evitando carga en la nube.
+- Usa `VITE_AGENT_BACKEND=gemini` o `VITE_AGENT_BACKEND=ollama` para fijar el comportamiento en tiempo de construcción.
+- Localmente, `VITE_OLLAMA_MODEL` puede apuntar a `mistral`, `llama3`, `mistral-nemo`, etc.
+
+## Almacenamiento S3
+- El servidor expone `/api/s3/presign` para obtener URLs presignadas de PUT.
+- El cliente usa `/src/services/storage/s3.ts` para subir archivos de forma segura sin exponer credenciales.
+- Define `S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, y `AWS_SECRET_ACCESS_KEY` en `.env` o `.env.local`.
+
 ## Branch strategy
 - `main` - versión estable de producción
 - `dev` - integración continua

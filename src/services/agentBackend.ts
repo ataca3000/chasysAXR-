@@ -14,10 +14,10 @@ export async function getRecommendations(telemetry: any, machineStatus: string) 
     const prompt = buildPrompt(telemetry, machineStatus);
 
     try {
-      const resp = await fetch(`/api/ollama/run/${encodeURIComponent(model)}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+const resp = await fetch(`/api/ollama/api/generate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model, prompt, format: 'json', stream: false }),
       });
 
       if (resp.ok) {
@@ -49,7 +49,7 @@ export async function getRecommendations(telemetry: any, machineStatus: string) 
 
 export async function checkLocalBackendHealth() {
   try {
-    const resp = await fetch('/api/ollama/models');
+    const resp = await fetch('/api/ollama/api/models');
     return resp.ok;
   } catch {
     return false;
