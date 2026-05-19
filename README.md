@@ -48,12 +48,6 @@ npm run typecheck
 - Usa `VITE_AGENT_BACKEND=gemini` o `VITE_AGENT_BACKEND=ollama` para fijar el comportamiento en tiempo de construcción.
 - Localmente, `VITE_OLLAMA_MODEL` puede apuntar a `mistral`, `llama3`, `mistral-nemo`, etc.
 
-## Autenticación
-- El proyecto soporta inicio de sesión con Google, GitHub y enlace mágico por correo.
-- Para Google/GitHub necesitas `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID` y `GITHUB_CLIENT_SECRET`.
-- Para correo mágico necesitas SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` y `SMTP_FROM`.
-- La UI usa `/api/auth/me`, `/api/auth/magic`, `/api/auth/google`, `/api/auth/github` y `/api/auth/logout`.
-
 ## Almacenamiento S3
 - El servidor expone `/api/s3/presign` para obtener URLs presignadas de PUT.
 - El cliente usa `/src/services/storage/s3.ts` para subir archivos de forma segura sin exponer credenciales.
