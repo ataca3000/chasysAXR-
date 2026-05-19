@@ -242,3 +242,15 @@ router.get('/auth/github/callback', async (req, res) => {
 router.get('/auth/me', (req, res) => {
   res.json({ user: (req as any).session.user || null });
 });
+
+// Logout route
+router.post('/auth/logout', (req, res) => {
+  (req as any).session.destroy((err: any) => {
+    if (err) {
+      console.error('Logout failed:', err);
+      return res.status(500).json({ error: 'Logout failed' });
+    }
+    res.clearCookie('connect.sid');
+    res.json({ ok: true });
+  });
+});
