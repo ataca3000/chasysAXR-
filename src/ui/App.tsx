@@ -14,9 +14,11 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { getAgentRecommendations } from "../services/geminiService";
-import { OnboardingChat } from "./components/OnboardingChat";
+import { OnboardingChatFloating } from "./components/OnboardingChatFloating";
 import { useOnboardingState } from "../hooks/useOnboardingState";
 import { OllamaSetupGuide } from "./components/OllamaSetupGuide";
+import { RequirementsChecklist } from "./components/RequirementsChecklist";
+import { LabChat } from "./components/LabChat";
 import { ARCameraLayer } from "./components/ARCameraLayer";
 import { VoiceAssistant } from "./components/VoiceAssistant";
 import { AssemblyLab } from "./components/AssemblyLab";
@@ -55,6 +57,7 @@ function AppContent() {
     completeOnboarding,
     skipOnboarding,
   } = useOnboardingState();
+  const [showOnboarding, setShowOnboarding] = useState(!isOnboardingComplete);
   const [aiInsights, setAiInsights] = useState<{
     html: string;
     gcode: string[];

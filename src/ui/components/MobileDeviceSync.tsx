@@ -66,6 +66,7 @@ export function MobileDeviceSync() {
         </div>
         <button
           onClick={() => setShowQR(!showQR)}
+          title="Mostrar código QR"
           className="flex items-center gap-2 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/40 rounded-lg text-sm text-purple-300 transition"
         >
           <QrCode className="w-4 h-4" />
@@ -93,6 +94,7 @@ export function MobileDeviceSync() {
                 </h3>
                 <button
                   onClick={() => setShowQR(false)}
+                  title="Cerrar"
                   className="text-gray-400 hover:text-white"
                 >
                   <X className="w-5 h-5" />
@@ -217,6 +219,7 @@ export function MobileDeviceSync() {
                   disconnectDevice(selectedDevice);
                   setSelectedDevice(null);
                 }}
+                title="Desconectar"
                 className="p-2 bg-red-600/20 hover:bg-red-600/40 rounded-lg text-red-400 transition"
               >
                 <X className="w-4 h-4" />
