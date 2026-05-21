@@ -13,7 +13,11 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "analyze": "vite build --sourcemap",
-    "release": "standard-version"
+    "release": "standard-version",
+    "setup:ollama": "powershell -NoProfile -ExecutionPolicy Bypass -File setup-ollama.ps1",
+    "setup:ollama:mac": "bash setup-ollama.sh",
+    "start": "concurrently \"npm run dev\" \"npm run dev:server\"",
+    "start:local": "npm run start & ollama serve"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
