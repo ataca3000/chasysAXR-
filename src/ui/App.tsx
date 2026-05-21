@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { getAgentRecommendations } from "../services/geminiService";
+import { OnboardingChat } from "./components/OnboardingChat";
+import { useOnboardingState } from "../hooks/useOnboardingState";
 import { OllamaSetupGuide } from "./components/OllamaSetupGuide";
 import { ARCameraLayer } from "./components/ARCameraLayer";
 import { VoiceAssistant } from "./components/VoiceAssistant";
@@ -22,6 +24,7 @@ import { MobileScanner } from "./components/MobileScanner";
 import { LocalModelManager } from "./components/LocalModelManager";
 import DigitalTwin from "./components/DigitalTwin";
 import { JarvisCompanion } from "./components/JarvisCompanion";
+import { MobileDeviceSync } from "./components/MobileDeviceSync";
 import { CommandCenterView } from "./views/CommandCenterView";
 import { ThermalImagingView } from "./views/ThermalImagingView";
 import { PlasmaCuttingView } from "./views/PlasmaCuttingView";
@@ -45,6 +48,13 @@ export default function App() {
 function AppContent() {
   const { currentTelemetry, telemetryHistory, isCriticalAlarm, systemError } =
     useTelemetry();
+  const {
+    isOnboardingComplete,
+    isLoading: onboardingLoading,
+    machineProfile,
+    completeOnboarding,
+    skipOnboarding,
+  } = useOnboardingState();
   const [aiInsights, setAiInsights] = useState<{
     html: string;
     gcode: string[];
@@ -112,6 +122,13 @@ function AppContent() {
       setLoadingAi(false);
     }
   };
+
+  // Show onboarding if not complete
+  if (!onboardingLoading && !isOnboardingComplete) {
+    return (
+      <OnboardingChat onComplete={completeOnboarding} onSkip={skipOnboarding} />
+    );
+  }
 
   return (
     <div

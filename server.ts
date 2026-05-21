@@ -5,6 +5,7 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 import dotenv from "dotenv";
 import session from "express-session";
 import apiRoutes from "./src/server/routes/api";
+import setupDeviceSyncServer from "./src/server/deviceSync";
 
 async function startServer() {
   const app = express();
@@ -19,7 +20,7 @@ async function startServer() {
       resave: false,
       saveUninitialized: false,
       cookie: { secure: false },
-    })
+    }),
   );
 
   // Mount API routes
@@ -27,63 +28,72 @@ async function startServer() {
 
   // Proxy Gemini API to hide the API key from the client
   const geminiProxy = createProxyMiddleware({
-    target: 'https://generativelanguage.googleapis.com',
+    target: "https://generativelanguage.googleapis.com",
     changeOrigin: true,
     ws: true, // Enable websocket proxy
     pathRewrite: {
-      '^/api/gemini': '',
+      "^/api/gemini": "",
     },
     on: {
       proxyReq: (proxyReq) => {
         // Add API key header for standard requests
         const apiKey = process.env.GEMINI_API_KEY;
         if (apiKey) {
-          proxyReq.setHeader('x-goog-api-key', apiKey);
+          proxyReq.setHeader("x-goog-api-key", apiKey);
         }
       },
       proxyReqWs: (proxyReqWs) => {
         const apiKey = process.env.GEMINI_API_KEY;
         if (apiKey) {
-          proxyReqWs.setHeader('x-goog-api-key', apiKey);
+          proxyReqWs.setHeader("x-goog-api-key", apiKey);
         }
-      }
-    }
+      },
+    },
   });
 
   // Intercept the URL to add the key securely
-  const geminiInterceptor = (req: express.Request, _res: express.Response, next: express.NextFunction) => {
-    const apiKey = process.env.GEMINI_API_KEY || '';
-    
+  const geminiInterceptor = (
+    req: express.Request,
+    _res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    const apiKey = process.env.GEMINI_API_KEY || "";
+
     // Robust injection: Replace any existing key parameter or append a new one
-    if (req.url.includes('key=')) {
+    if (req.url.includes("key=")) {
       req.url = req.url.replace(/key=[^&]*/, `key=${apiKey}`);
     } else if (apiKey) {
-      const separator = req.url.includes('?') ? '&' : '?';
+      const separator = req.url.includes("?") ? "&" : "?";
       req.url = `${req.url}${separator}key=${apiKey}`;
     }
-    
+
     // Also inject header just in case proxyReq isn't enough
-    req.headers['x-goog-api-key'] = apiKey;
-    
+    req.headers["x-goog-api-key"] = apiKey;
+
     next();
   };
 
-  app.use('/api/gemini', geminiInterceptor, geminiProxy);
+  app.use("/api/gemini", geminiInterceptor, geminiProxy);
 
   // Ollama Proxy to allow frontend to communicate with local Ollama instance
   const ollamaProxy = createProxyMiddleware({
-    target: 'http://localhost:11434',
+    target: "http://localhost:11434",
     changeOrigin: true,
     pathRewrite: {
-      '^/api/ollama': '',
+      "^/api/ollama": "",
     },
     on: {
       error: (_err, _req, res) => {
-        (res as any).status(503).json({ error: "Ollama is not running. Please start Ollama on your machine." });
-      }
-    }
+        (res as any)
+          .status(503)
+          .json({
+            error:
+              "Ollama is not running. Please start Ollama on your machine.",
+          });
+      },
+    },
   });
-  app.use('/api/ollama', ollamaProxy);
+  app.use("/api/ollama", ollamaProxy);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
@@ -94,10 +104,10 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     // Serve production files
-    const distPath = path.join(process.cwd(), 'dist');
+    const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+    app.get("*", (_req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
@@ -105,15 +115,18 @@ async function startServer() {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 
+  // Setup Device Sync WebSocket server for mobile device connections
+  setupDeviceSyncServer(server);
+
   // REQUIRED for http-proxy-middleware to handle websocket upgrades!
-  server.on('upgrade', (req, socket, head) => {
-    if (req.url?.startsWith('/api/gemini')) {
+  server.on("upgrade", (req, socket, head) => {
+    if (req.url?.startsWith("/api/gemini")) {
       // Apply the same URL interceptor logic for WS upgrades
-      const apiKey = process.env.GEMINI_API_KEY || '';
-      if (req.url.includes('key=')) {
+      const apiKey = process.env.GEMINI_API_KEY || "";
+      if (req.url.includes("key=")) {
         req.url = req.url.replace(/key=[^&]*/, `key=${apiKey}`);
       } else if (apiKey) {
-        const separator = req.url.includes('?') ? '&' : '?';
+        const separator = req.url.includes("?") ? "&" : "?";
         req.url = `${req.url}${separator}key=${apiKey}`;
       }
       geminiProxy.upgrade(req, socket as any, head);
