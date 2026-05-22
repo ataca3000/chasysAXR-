@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, ChevronRight, Zap, Cog, MessageCircle, X } from "lucide-react";
+import { Send, ChevronRight, Zap, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 export interface MachineProfile {
@@ -157,7 +157,7 @@ export function OnboardingChat({ onComplete, onSkip }: OnboardingChatProps) {
         break;
 
       case "machine-type":
-        const selected = Object.entries(MACHINE_TYPES).find(([_, value]) =>
+        const selected = Object.entries(MACHINE_TYPES).find(([_key, value]) =>
           response.includes(value.label),
         );
         if (selected) {
@@ -251,7 +251,7 @@ export function OnboardingChat({ onComplete, onSkip }: OnboardingChatProps) {
             role: "gopilot",
             content: "Claro, volvamos al inicio. ¿Qué tipo de máquina tienes?",
             options: Object.entries(MACHINE_TYPES).map(
-              ([_, value]) => `${value.emoji} ${value.label}`,
+              ([_k, value]) => `${value.emoji} ${value.label}`,
             ),
             action: "select-machine",
           };

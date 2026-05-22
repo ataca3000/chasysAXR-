@@ -1,6 +1,6 @@
 export async function connectWebSerial() {
   const filters = [{ usbVendorId: 0x2341 }, { usbProductId: 0x8036 }];
-  const port = await navigator.serial.requestPort({ filters });
+  const port = await (navigator as any).serial.requestPort({ filters });
   await port.open({ baudRate: 115200 });
   return port;
 }

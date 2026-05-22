@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MachineProfile } from "../components/OnboardingChat";
+import { MachineProfile } from "../ui/components/OnboardingChat";
 
 const ONBOARDING_KEY = "gopilot_onboarding_complete";
 const MACHINE_PROFILE_KEY = "gopilot_machine_profile";

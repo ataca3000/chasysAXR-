@@ -14,11 +14,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { getAgentRecommendations } from "../services/geminiService";
-import { OnboardingChatFloating } from "./components/OnboardingChatFloating";
 import { useOnboardingState } from "../hooks/useOnboardingState";
 import { OllamaSetupGuide } from "./components/OllamaSetupGuide";
-import { RequirementsChecklist } from "./components/RequirementsChecklist";
-import { LabChat } from "./components/LabChat";
 import { ARCameraLayer } from "./components/ARCameraLayer";
 import { VoiceAssistant } from "./components/VoiceAssistant";
 import { AssemblyLab } from "./components/AssemblyLab";
@@ -26,12 +23,12 @@ import { MobileScanner } from "./components/MobileScanner";
 import { LocalModelManager } from "./components/LocalModelManager";
 import DigitalTwin from "./components/DigitalTwin";
 import { JarvisCompanion } from "./components/JarvisCompanion";
-import { MobileDeviceSync } from "./components/MobileDeviceSync";
 import { CommandCenterView } from "./views/CommandCenterView";
 import { ThermalImagingView } from "./views/ThermalImagingView";
 import { PlasmaCuttingView } from "./views/PlasmaCuttingView";
 import { PredictiveMaintenanceView } from "./views/PredictiveMaintenanceView";
 import { useTelemetry, telemetryStore } from "../store/telemetryStore";
+import { OnboardingChat } from "./components/OnboardingChat";
 
 export default function App() {
   const isMobileScanner = window.location.search.includes("role=mobile-cam");
@@ -53,11 +50,10 @@ function AppContent() {
   const {
     isOnboardingComplete,
     isLoading: onboardingLoading,
-    machineProfile,
     completeOnboarding,
     skipOnboarding,
   } = useOnboardingState();
-  const [showOnboarding, setShowOnboarding] = useState(!isOnboardingComplete);
+  const [_showOnboarding, setShowOnboarding] = useState(!isOnboardingComplete);
   const [aiInsights, setAiInsights] = useState<{
     html: string;
     gcode: string[];

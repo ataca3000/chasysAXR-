@@ -9,16 +9,16 @@ interface RegisteredDevice {
 }
 
 export function setupDeviceSyncServer(server: any) {
-  const wss = new WebSocketServer({ path: "/api/device-sync", server });
+  const _wss = new WebSocketServer({ path: "/api/device-sync", server });
   const devices = new Map<string, RegisteredDevice>();
 
-  wss.on("connection", (ws: WebSocket) => {
+  _wss.on("connection", (ws: WebSocket) => {
     console.log("New WebSocket connection for device sync");
 
     ws.on("message", (data: string) => {
       try {
         const message = JSON.parse(data);
-        handleMessage(ws, message, devices, wss);
+        handleMessage(ws, message, devices, _wss);
       } catch (error) {
         console.error("Error parsing message:", error);
         ws.send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
@@ -32,7 +32,7 @@ export function setupDeviceSyncServer(server: any) {
         if (device.ws === ws) {
           devices.delete(id);
           // Notify others that device left
-          broadcastToAll(wss, devices, {
+          broadcastToAll(_wss, devices, {
             type: "device-left",
             from: id,
           });
@@ -58,7 +58,7 @@ export function setupDeviceSyncServer(server: any) {
     }
   }, 10000);
 
-  return wss;
+  return _wss;
 }
 
 function handleMessage(

@@ -4,7 +4,8 @@ import { OrbitControls, Environment, Grid, Html, QuadraticBezierLine } from '@re
 import { Plus, Boxes, Trash2, Cloud, UploadCloud, LogIn, Upload, Link2, Unlink, X, Activity, WifiOff, Clock, ArrowRightCircle } from 'lucide-react';
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User } from 'firebase/auth';
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../../firebase';
+import { db, auth, handleFirestoreError, OperationType, isFirebaseEnabled } from '../../firebase';
+import { RingGeometry } from 'three';
 // @ts-ignore
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 // @ts-ignore
@@ -45,7 +46,7 @@ const MachineNode = ({ id, index, position, type, url, fileExt, images, isSelect
           <ringGeometry args={[1.5, 1.7, 32]} />
           <meshBasicMaterial color="#4285F4" side={2} />
           <lineSegments>
-             <edgesGeometry args={[new (require('three').RingGeometry)(1.5, 1.7, 32)]} />
+             <edgesGeometry args={[new RingGeometry(1.5, 1.7, 32)]} />
              <lineBasicMaterial color="#4285F4" />
           </lineSegments>
         </mesh>
@@ -178,6 +179,15 @@ export function AssemblyLab() {
   const allNodes: Array<{ id: string; type: string; position: [number, number, number]; url?: string; fileExt?: string; sensors?: string[]; images?: string[] }> = [...machines, ...customMachines];
 
   useEffect(() => {
+    if (!isFirebaseEnabled) {
+      setUser({
+        uid: 'local-user',
+        email: 'local-user@example.com',
+        displayName: 'Local Engineer',
+        photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
+      } as any);
+      return;
+    }
     const unsub = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
     });
@@ -189,6 +199,21 @@ export function AssemblyLab() {
       setMachines([]);
       return;
     }
+
+    if (!isFirebaseEnabled) {
+      const localData = localStorage.getItem('nexus_cam_machines');
+      if (localData) {
+        try {
+          setMachines(JSON.parse(localData));
+        } catch (e) {
+          console.error("Error loading machines from local storage", e);
+        }
+      } else {
+        setMachines([]);
+      }
+      return;
+    }
+
     const machinesRef = collection(db, 'users', user.uid, 'machines');
     const unsub = onSnapshot(machinesRef, (snapshot) => {
       const loadedMachines: any[] = [];
@@ -217,6 +242,7 @@ export function AssemblyLab() {
   }, [user]); // Re-bind if user changes since addMachine depends on user
 
   const handleSignIn = async () => {
+    if (!isFirebaseEnabled) return;
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
@@ -283,6 +309,20 @@ export function AssemblyLab() {
     const id = Math.random().toString(36).substring(7);
     const position = [(Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6];
     
+    if (!isFirebaseEnabled) {
+      const newMachine = {
+        id,
+        type,
+        position: position as [number, number, number],
+        sensors: [],
+        images: extraData.images || []
+      };
+      const updated = [...machines, newMachine];
+      setMachines(updated);
+      localStorage.setItem('nexus_cam_machines', JSON.stringify(updated));
+      return;
+    }
+
     try {
       setSaving(true);
       await setDoc(doc(db, 'users', user.uid, 'machines', id), {
@@ -311,6 +351,16 @@ export function AssemblyLab() {
       ? currentSensors.filter(s => s !== sensorType)
       : [...currentSensors, sensorType];
 
+    if (!isFirebaseEnabled) {
+      const updated = machines.map(m => m.id === machineId ? { ...m, sensors: newSensors } : m);
+      setMachines(updated);
+      localStorage.setItem('nexus_cam_machines', JSON.stringify(updated));
+      if (selectedMachineDetails && selectedMachineDetails.id === machineId) {
+        setSelectedMachineDetails({ ...selectedMachineDetails, sensors: newSensors });
+      }
+      return;
+    }
+
     try {
       setSaving(true);
       await setDoc(doc(db, 'users', user.uid, 'machines', machineId), {
@@ -334,6 +384,13 @@ export function AssemblyLab() {
 
     if (isCustom) {
       setCustomMachines(customMachines.filter(m => m.id !== id));
+      return;
+    }
+    
+    if (!isFirebaseEnabled) {
+      const updated = machines.filter(m => m.id !== id);
+      setMachines(updated);
+      localStorage.setItem('nexus_cam_machines', JSON.stringify(updated));
       return;
     }
     

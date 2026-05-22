@@ -37,7 +37,7 @@ export async function dispatchAgentCommand(
     if (parsed.type === "ai") {
       const telemetry = parsed.payload?.telemetry ?? parsed.payload;
       const machineStatus = (telemetry as any)?.status ?? "OPERATIVO";
-      return await getRecommendations(telemetry, machineStatus);
+      return await getRecommendations(telemetry as any, machineStatus);
     }
   } finally {
     store.setStatus("idle");

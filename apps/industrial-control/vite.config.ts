@@ -7,7 +7,7 @@ export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
     plugins: [react(), tailwindcss()],
-    base: '/Gopilot-INDUSTRIAL/',
+    base: process.env.VERCEL ? '/' : '/Gopilot-INDUSTRIAL/',
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

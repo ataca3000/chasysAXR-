@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Cpu, Zap, Play } from "lucide-react";
+import { Cpu, Play } from "lucide-react";
 import { dispatchAgentCommand, AgentCommandResult } from "../../agents/core";
 import { hardware } from "../../services/hardwareController";
 

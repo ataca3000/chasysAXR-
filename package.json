@@ -1,0 +1,12 @@
+{
+  "name": "gopilot-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev": "npm run dev --workspaces",
+    "clean": "rimraf node_modules apps/*/node_modules apps/*/dist apps/*/build .turbo"
+  }
+}

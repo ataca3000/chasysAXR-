@@ -1,5 +1,3 @@
-import React from "react";
-
 export function StatusCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="status-card p-4 rounded-2xl border border-slate-700 bg-slate-950/80">

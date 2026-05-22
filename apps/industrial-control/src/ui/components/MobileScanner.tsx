@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, X, RefreshCw, Signal } from 'lucide-react';
-import { auth } from '../../firebase';
+import { auth, isFirebaseEnabled } from '../../firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import Peer from 'peerjs';
 
 export function MobileScanner() {
-  const [user, setUser] = useState(auth.currentUser);
+  const [user, setUser] = useState(auth?.currentUser || null);
   const [peer, setPeer] = useState<Peer | null>(null);
   const [status, setStatus] = useState<string>('Initializing...');
   const [connected, setConnected] = useState(false);
@@ -13,6 +13,14 @@ export function MobileScanner() {
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
+    if (!isFirebaseEnabled) {
+      setUser({
+        uid: 'local-user',
+        email: 'local-user@example.com',
+        displayName: 'Local Engineer'
+      } as any);
+      return;
+    }
     const unsub = onAuthStateChanged(auth, u => {
       setUser(u);
     });
@@ -20,6 +28,7 @@ export function MobileScanner() {
   }, []);
 
   const login = () => {
+    if (!isFirebaseEnabled) return;
     signInWithPopup(auth, new GoogleAuthProvider()).catch(console.error);
   };
 

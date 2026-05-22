@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from "react";
+// @ts-ignore - qr-scanner may not have types
 import { QrScanner } from "qr-scanner";
-import { Smartphone, Send, Volume2, VolumeX, X, Loader } from "lucide-react";
+import { Smartphone, Volume2, VolumeX, X, Loader } from "lucide-react";
 import { motion } from "motion/react";
 
 export function MobileClientApp() {
   const [step, setStep] = useState<"scan" | "connecting" | "connected">("scan");
-  const [scannedData, setScannedData] = useState<any>(null);
   const [peerConnection, setPeerConnection] =
     useState<RTCPeerConnection | null>(null);
-  const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
   const [signalingWs, setSignalingWs] = useState<WebSocket | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -47,7 +46,6 @@ export function MobileClientApp() {
     try {
       const data = JSON.parse(qrData);
       if (data.deviceId && data.host) {
-        setScannedData(data);
         setStep("connecting");
         qrScannerRef.current?.stop();
         connectToControlPanel(data);
@@ -169,13 +167,12 @@ export function MobileClientApp() {
     }
   };
 
-  const setupDataChannel = (dataChannel: RTCDataChannel) => {
-    dataChannel.onopen = () => console.log("Data channel opened");
-    dataChannel.onmessage = (event) => {
+  const setupDataChannel = (channel: RTCDataChannel) => {
+    channel.onopen = () => console.log("Data channel opened");
+    channel.onmessage = (event) => {
       const message = JSON.parse(event.data);
       console.log("Command from control panel:", message);
     };
-    setDataChannel(dataChannel);
   };
 
   const disconnect = () => {
@@ -190,7 +187,6 @@ export function MobileClientApp() {
     }
     setStep("scan");
     setPeerConnection(null);
-    setDataChannel(null);
   };
 
   return (

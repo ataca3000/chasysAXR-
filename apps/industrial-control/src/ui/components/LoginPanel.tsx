@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export function LoginPanel() {
   const [user, setUser] = useState<any>(null);

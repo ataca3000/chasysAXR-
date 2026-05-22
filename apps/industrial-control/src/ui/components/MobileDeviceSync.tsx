@@ -10,7 +10,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import QRCode from "qrcode.react";
+import { QRCodeSVG as QRCode } from "qrcode.react";
 import useMobileDeviceSync from "../../hooks/useMobileDeviceSync";
 
 export function MobileDeviceSync() {

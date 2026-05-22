@@ -2,78 +2,11 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { createProxyMiddleware } from "http-proxy-middleware";
-import dotenv from "dotenv";
-import session from "express-session";
-import apiRoutes from "./src/server/routes/api";
+import { app, geminiProxy } from "./src/server/app";
 import setupDeviceSyncServer from "./src/server/deviceSync";
 
 async function startServer() {
-  const app = express();
   const PORT = 3000;
-
-  app.use(express.json());
-
-  // Session middleware for auth flows
-  app.use(
-    session({
-      secret: process.env.SESSION_SECRET || "dev_secret_change_me",
-      resave: false,
-      saveUninitialized: false,
-      cookie: { secure: false },
-    }),
-  );
-
-  // Mount API routes
-  app.use("/api", apiRoutes);
-
-  // Proxy Gemini API to hide the API key from the client
-  const geminiProxy = createProxyMiddleware({
-    target: "https://generativelanguage.googleapis.com",
-    changeOrigin: true,
-    ws: true, // Enable websocket proxy
-    pathRewrite: {
-      "^/api/gemini": "",
-    },
-    on: {
-      proxyReq: (proxyReq) => {
-        // Add API key header for standard requests
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (apiKey) {
-          proxyReq.setHeader("x-goog-api-key", apiKey);
-        }
-      },
-      proxyReqWs: (proxyReqWs) => {
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (apiKey) {
-          proxyReqWs.setHeader("x-goog-api-key", apiKey);
-        }
-      },
-    },
-  });
-
-  // Intercept the URL to add the key securely
-  const geminiInterceptor = (
-    req: express.Request,
-    _res: express.Response,
-    next: express.NextFunction,
-  ) => {
-    const apiKey = process.env.GEMINI_API_KEY || "";
-
-    // Robust injection: Replace any existing key parameter or append a new one
-    if (req.url.includes("key=")) {
-      req.url = req.url.replace(/key=[^&]*/, `key=${apiKey}`);
-    } else if (apiKey) {
-      const separator = req.url.includes("?") ? "&" : "?";
-      req.url = `${req.url}${separator}key=${apiKey}`;
-    }
-
-    // Also inject header just in case proxyReq isn't enough
-    req.headers["x-goog-api-key"] = apiKey;
-
-    next();
-  };
-
-  app.use("/api/gemini", geminiInterceptor, geminiProxy);
 
   // Ollama Proxy to allow frontend to communicate with local Ollama instance
   const ollamaProxy = createProxyMiddleware({

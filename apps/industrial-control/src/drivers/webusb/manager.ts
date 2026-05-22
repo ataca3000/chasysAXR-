@@ -1,5 +1,5 @@
 export async function connectWebUsb() {
-  const device = await navigator.usb.requestDevice({ filters: [] });
+  const device = await (navigator as any).usb.requestDevice({ filters: [] });
   await device.open();
   if (!device.configuration) {
     await device.selectConfiguration(1);
