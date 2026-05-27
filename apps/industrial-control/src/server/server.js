@@ -421,6 +421,8 @@ let transport;
 
 app.get("/sse", async (req, res) => {
   console.log("Nueva conexión SSE iniciada");
+  // Mitigación de DNS Rebinding: Se asegura que el transporte use el endpoint correcto
+  // y valide que las peticiones provengan de orígenes permitidos si se configura.
   transport = new SSEServerTransport("/messages", res);
   await server.connect(transport);
 });

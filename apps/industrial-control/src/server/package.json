@@ -6,7 +6,7 @@
   "main": "server.js",
   "type": "module",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "latest",
+    "@modelcontextprotocol/sdk": "^1.6.0",
     "mqtt": "^5.10.1",
     "octokit": "^4.0.2",
     "serialport": "^12.0.0",
