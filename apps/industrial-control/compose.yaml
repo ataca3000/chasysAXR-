@@ -1,6 +1,0 @@
-services:
-  nexuscamai2:
-    image: nexuscamai2
-    build:
-      context: .
-      dockerfile: ./Dockerfile

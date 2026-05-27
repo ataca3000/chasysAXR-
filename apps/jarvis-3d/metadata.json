@@ -1,6 +1,0 @@
-{
-  "name": "Jarvis 3D Companion",
-  "description": "A collaborative engineering companion that conceptualizes your ideas into 3D prototypes.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
