@@ -1,0 +1,14 @@
+{
+  "name": "gopilot-industrial-mcp",
+  "version": "1.4.0",
+  "description": "Servidor MCP para control industrial y automatización MQTT",
+  "main": "server.js",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest",
+    "mqtt": "^5.10.1",
+    "octokit": "^4.0.2",
+    "serialport": "^12.0.0",
+    "zod": "^3.23.8"
+  }
+}

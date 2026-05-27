@@ -1,0 +1,25 @@
+steps:
+  # 1. Construir la imagen de Docker
+  - name: "gcr.io/cloud-builders/docker"
+    args: ["build", "-t", "gcr.io/$PROJECT_ID/gopilot-industrial", "."]
+
+  # 2. Subir la imagen al registro de Google
+  - name: "gcr.io/cloud-builders/docker"
+    args: ["push", "gcr.io/$PROJECT_ID/gopilot-industrial"]
+
+  # 3. Desplegar en Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "gopilot-app"
+      - "--image"
+      - "gcr.io/$PROJECT_ID/gopilot-industrial"
+      - "--region"
+      - "us-central1"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+images:
+  - "gcr.io/$PROJECT_ID/gopilot-industrial"
