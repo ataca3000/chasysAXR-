@@ -21,6 +21,7 @@ import { VoiceAssistant } from "./components/VoiceAssistant";
 import { AssemblyLab } from "./components/AssemblyLab";
 import { MobileScanner } from "./components/MobileScanner";
 import { LocalModelManager } from "./components/LocalModelManager";
+import VisionTest from "./components/VisionTest";
 import DigitalTwin from "./components/DigitalTwin";
 import { JarvisCompanion } from "./components/JarvisCompanion";
 import { CommandCenterView } from "./views/CommandCenterView";
@@ -441,7 +442,10 @@ function AppContent() {
 
             {activeView === "ai_models" && (
               <div className="xl:col-span-3">
-                <LocalModelManager />
+                <div className="grid grid-cols-2 gap-4">
+                  <LocalModelManager />
+                  <VisionTest />
+                </div>
               </div>
             )}
 

@@ -118,8 +118,34 @@ router.post("/chat", async (req, res) => {
       }
     }
 
+    // If Ollama did not produce a result, try Gemini fallback if configured
     if (!result) {
-      return res.status(500).json({ error: 'No local AI backend is available. Inicia Ollama localmente en el puerto 11434.' });
+      const geminiKey = process.env.GEMINI_API_KEY;
+      if (geminiKey) {
+        try {
+          // Quick fallback to Google Generative Language REST API (basic usage)
+          const modelName = process.env.GEMINI_MODEL || "text-bison-001";
+          const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generate?key=${geminiKey}`;
+          const payload = {
+            prompt: { text: `System: You are Jarvis. Return ONLY JSON. Context: ${JSON.stringify(currentScene)}. User: ${prompt}` },
+            temperature: 0.2,
+            maxOutputTokens: 512,
+          };
+
+          const gemRes = await axios.post(url, payload, { timeout: 15000 });
+
+          // Try to extract a reasonable text result; if uncertain, attach full response
+          const textOutput = (gemRes.data?.candidates && gemRes.data.candidates[0]?.content) || gemRes.data?.output || gemRes.data;
+          result = { message: textOutput };
+        } catch (ge) {
+          console.warn("Gemini fallback failed:", ge?.message || ge);
+          // no-op, will return error below
+        }
+      }
+
+      if (!result) {
+        return res.status(500).json({ error: 'No local AI backend is available. Inicia Ollama localmente en el puerto 11434, o configura GEMINI_API_KEY para fallback.' });
+      }
     }
 
     if (result) {
@@ -131,6 +157,31 @@ router.post("/chat", async (req, res) => {
   } catch (error) {
     console.error('AI chat API Error:', error);
     res.status(500).json({ error: 'Failed to process request.' });
+  }
+});
+
+// Simple vision analysis stub: accepts { imageBase64: string }
+router.post('/vision', async (req, res) => {
+  try {
+    const { imageBase64 } = req.body || {};
+    if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
+
+    // NOTE: This is a stub. Replace with real vision model call or edge detector.
+    // Example response simulating object detection + simple recommendation.
+    const detections = [
+      { label: 'object', confidence: 0.92, bbox: [0.12, 0.34, 0.2, 0.15] },
+      { label: 'defect', confidence: 0.67, bbox: [0.55, 0.2, 0.1, 0.18] },
+    ];
+
+    const recommendation = {
+      action: 'inspect',
+      reason: 'Detected potential defect with confidence > 0.6',
+    };
+
+    return res.json({ ok: true, detections, recommendation });
+  } catch (err: any) {
+    console.error('Vision stub error:', err);
+    return res.status(500).json({ error: String(err?.message || err) });
   }
 });
 
