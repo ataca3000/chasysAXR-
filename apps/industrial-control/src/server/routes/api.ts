@@ -7,7 +7,7 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { networkInterfaces } from "os";
 import { exec } from "child_process";
-import Jimp from "jimp";
+import { Jimp } from "jimp";
 import { db } from "./firebase"; // Corregido para usar el archivo en la misma carpeta
 
 dotenv.config();
@@ -92,8 +92,8 @@ async function analyzeImageEdge(imageBase64: string) {
   const buffer = Buffer.from(base64, "base64");
   const image = await Jimp.read(buffer);
 
-  const width = image.getWidth();
-  const height = image.getHeight();
+  const width = image.bitmap.width;
+  const height = image.bitmap.height;
   const sampleStep = 10;
   let totalBrightness = 0;
   let darkPixels = 0;
@@ -120,7 +120,7 @@ async function analyzeImageEdge(imageBase64: string) {
     metadata: {
       width,
       height,
-      imageFormat: image.getMIME(),
+      imageFormat: (image as any).getMIME?.() || image.mime || "image/png",
       averageBrightness: Number(averageBrightness.toFixed(3)),
       darkRatio: Number(darkRatio.toFixed(3)),
       defectLikely,
@@ -264,7 +264,7 @@ router.post("/chat", async (req, res) => {
           await logFallbackEvent("chat", true, "gemini_success", {
             model: modelName,
           });
-        } catch (ge) {
+        } catch (ge: any) {
           await logFallbackEvent("chat", false, "gemini_error", {
             error: String(ge?.message || ge),
           });
@@ -275,12 +275,10 @@ router.post("/chat", async (req, res) => {
       }
 
       if (!result) {
-        return res
-          .status(500)
-          .json({
-            error:
-              "No local AI backend is available. Inicia Ollama localmente en el puerto 11434, o configura GEMINI_API_KEY para fallback.",
-          });
+        return res.status(500).json({
+          error:
+            "No local AI backend is available. Inicia Ollama localmente en el puerto 11434, o configura GEMINI_API_KEY para fallback.",
+        });
       }
     }
 
@@ -350,7 +348,7 @@ router.post("/vision", async (req, res) => {
         await logFallbackEvent("vision", true, "ollama_reasoning_success", {
           model: modelName,
         });
-      } catch (oe) {
+      } catch (oe: any) {
         await logFallbackEvent("vision", false, "ollama_reasoning_error", {
           error: String(oe?.message || oe),
         });
@@ -402,7 +400,7 @@ router.post("/vision", async (req, res) => {
         await logFallbackEvent("vision", true, "gemini_success", {
           model: modelName,
         });
-      } catch (ge) {
+      } catch (ge: any) {
         await logFallbackEvent("vision", false, "gemini_error", {
           error: String(ge?.message || ge),
         });
