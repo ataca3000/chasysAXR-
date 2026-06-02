@@ -7,6 +7,10 @@
       "config": {
         "distDir": "apps/industrial-control/dist"
       }
+    },
+    {
+      "src": "apps/industrial-control/api/index.ts",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -15,7 +19,7 @@
     },
     {
       "src": "/api/(.*)",
-      "dest": "/apps/industrial-control/api/$1"
+      "dest": "/apps/industrial-control/api/index.ts"
     },
     {
       "src": "/(.*)",

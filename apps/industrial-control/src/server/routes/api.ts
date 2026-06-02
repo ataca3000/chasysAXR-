@@ -47,14 +47,26 @@ const s3Client = new S3Client({
 });
 
 const CHAT_FALLBACK_ENABLED = process.env.CHAT_USE_GEMINI_FALLBACK !== "false";
-const VISION_FALLBACK_ENABLED = process.env.VISION_USE_GEMINI_FALLBACK !== "false";
-const VISION_OLLAMA_REASONING_ENABLED = process.env.VISION_USE_OLLAMA_REASONING !== "false";
+const VISION_FALLBACK_ENABLED =
+  process.env.VISION_USE_GEMINI_FALLBACK !== "false";
+const VISION_OLLAMA_REASONING_ENABLED =
+  process.env.VISION_USE_OLLAMA_REASONING !== "false";
 const GEMINI_TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS || 15000);
-const VISION_GEMINI_TIMEOUT_MS = Number(process.env.VISION_GEMINI_TIMEOUT_MS || 20000);
-const VISION_OLLAMA_TIMEOUT_MS = Number(process.env.VISION_OLLAMA_TIMEOUT_MS || 15000);
-const GEMINI_FALLBACK_MAX_PER_MINUTE = Math.max(1, Number(process.env.GEMINI_FALLBACK_MAX_PER_MINUTE || 20));
+const VISION_GEMINI_TIMEOUT_MS = Number(
+  process.env.VISION_GEMINI_TIMEOUT_MS || 20000,
+);
+const VISION_OLLAMA_TIMEOUT_MS = Number(
+  process.env.VISION_OLLAMA_TIMEOUT_MS || 15000,
+);
+const GEMINI_FALLBACK_MAX_PER_MINUTE = Math.max(
+  1,
+  Number(process.env.GEMINI_FALLBACK_MAX_PER_MINUTE || 20),
+);
 
-const geminiFallbackMeter: Record<"chat" | "vision", { count: number; windowStart: number }> = {
+const geminiFallbackMeter: Record<
+  "chat" | "vision",
+  { count: number; windowStart: number }
+> = {
   chat: { count: 0, windowStart: Date.now() },
   vision: { count: 0, windowStart: Date.now() },
 };
@@ -116,7 +128,9 @@ async function analyzeImageEdge(imageBase64: string) {
     detections: [
       {
         label: defectLikely ? "potential_defect" : "operational_area",
-        confidence: defectLikely ? Number(Math.min(0.98, 0.5 + darkRatio).toFixed(2)) : Number(Math.max(0.6, averageBrightness).toFixed(2)),
+        confidence: defectLikely
+          ? Number(Math.min(0.98, 0.5 + darkRatio).toFixed(2))
+          : Number(Math.max(0.6, averageBrightness).toFixed(2)),
         bbox: [0, 0, 1, 1],
       },
     ],
@@ -194,7 +208,8 @@ router.get("/network-info", (_req, res) => {
 router.post("/chat", async (req, res) => {
   try {
     const { prompt, history, currentScene } = req.body;
-    const preferredBackend = process.env.AGENT_BACKEND || "ollama";
+    const defaultBackend = process.env.VERCEL === "1" ? "gemini" : "ollama";
+    const preferredBackend = process.env.AGENT_BACKEND || defaultBackend;
     let result = null;
     let errorLog = [];
 
@@ -230,18 +245,29 @@ router.post("/chat", async (req, res) => {
           const modelName = process.env.GEMINI_MODEL || "text-bison-001";
           const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generate?key=${geminiKey}`;
           const payload = {
-            prompt: { text: `System: You are Jarvis. Return ONLY JSON. Context: ${JSON.stringify(currentScene)}. User: ${prompt}` },
+            prompt: {
+              text: `System: You are Jarvis. Return ONLY JSON. Context: ${JSON.stringify(currentScene)}. User: ${prompt}`,
+            },
             temperature: 0.2,
             maxOutputTokens: 512,
           };
 
-          const gemRes = await axios.post(url, payload, { timeout: GEMINI_TIMEOUT_MS });
+          const gemRes = await axios.post(url, payload, {
+            timeout: GEMINI_TIMEOUT_MS,
+          });
 
-          const textOutput = (gemRes.data?.candidates && gemRes.data.candidates[0]?.content) || gemRes.data?.output || gemRes.data;
+          const textOutput =
+            (gemRes.data?.candidates && gemRes.data.candidates[0]?.content) ||
+            gemRes.data?.output ||
+            gemRes.data;
           result = { message: textOutput };
-          await logFallbackEvent("chat", true, "gemini_success", { model: modelName });
+          await logFallbackEvent("chat", true, "gemini_success", {
+            model: modelName,
+          });
         } catch (ge) {
-          await logFallbackEvent("chat", false, "gemini_error", { error: String(ge?.message || ge) });
+          await logFallbackEvent("chat", false, "gemini_error", {
+            error: String(ge?.message || ge),
+          });
           console.warn("Gemini fallback failed:", ge?.message || ge);
         }
       } else if (!canFallback && geminiKey) {
@@ -249,7 +275,12 @@ router.post("/chat", async (req, res) => {
       }
 
       if (!result) {
-        return res.status(500).json({ error: 'No local AI backend is available. Inicia Ollama localmente en el puerto 11434, o configura GEMINI_API_KEY para fallback.' });
+        return res
+          .status(500)
+          .json({
+            error:
+              "No local AI backend is available. Inicia Ollama localmente en el puerto 11434, o configura GEMINI_API_KEY para fallback.",
+          });
       }
     }
 
@@ -258,71 +289,85 @@ router.post("/chat", async (req, res) => {
       return res.json({ result });
     }
 
-    res.status(404).json({ error: 'No response generated' });
+    res.status(404).json({ error: "No response generated" });
   } catch (error) {
-    console.error('AI chat API Error:', error);
-    res.status(500).json({ error: 'Failed to process request.' });
+    console.error("AI chat API Error:", error);
+    res.status(500).json({ error: "Failed to process request." });
   }
 });
 
 // Simple vision analysis stub: accepts { imageBase64: string }
-router.post('/vision', async (req, res) => {
+router.post("/vision", async (req, res) => {
   try {
     const { imageBase64 } = req.body || {};
-    if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
+    if (!imageBase64)
+      return res.status(400).json({ error: "imageBase64 required" });
 
     const edgeAnalysis = await analyzeImageEdge(imageBase64);
     const responsePayload: any = {
       ok: true,
-      source: 'local_edge',
+      source: "local_edge",
       edgeAnalysis,
       detections: edgeAnalysis.detections,
       recommendation: {
-        action: edgeAnalysis.metadata.defectLikely ? 'inspect' : 'monitor',
+        action: edgeAnalysis.metadata.defectLikely ? "inspect" : "monitor",
         reason: edgeAnalysis.metadata.defectLikely
-          ? 'Low brightness or high dark pixel ratio detected in the image.'
-          : 'Image appears stable within the current lightweight edge analysis.',
+          ? "Low brightness or high dark pixel ratio detected in the image."
+          : "Image appears stable within the current lightweight edge analysis.",
       },
       reasoning: null,
       fallback: null,
     };
 
-    const ollamaReasoningEnabled = VISION_OLLAMA_REASONING_ENABLED && process.env.VITE_OLLAMA_MODEL;
+    const ollamaReasoningEnabled =
+      VISION_OLLAMA_REASONING_ENABLED && process.env.VITE_OLLAMA_MODEL;
     if (ollamaReasoningEnabled) {
       try {
-        const modelName = process.env.VITE_OLLAMA_MODEL || 'mistral';
+        const modelName = process.env.VITE_OLLAMA_MODEL || "mistral";
         const prompt = `System: You are a vision assistant. Use the provided edge metadata to improve detections or recommendation. Return ONLY JSON with keys: detections, recommendation, notes. Edge metadata: ${JSON.stringify(edgeAnalysis.metadata)}. Detections: ${JSON.stringify(edgeAnalysis.detections)}.`;
         const ollamaRes = await axios.post(
-          'http://localhost:11434/api/generate',
+          "http://localhost:11434/api/generate",
           {
             model: modelName,
             prompt,
             stream: false,
-            format: 'json',
+            format: "json",
           },
           { timeout: VISION_OLLAMA_TIMEOUT_MS },
         );
 
-        const reasoned = typeof ollamaRes.data.response === 'string'
-          ? JSON.parse(ollamaRes.data.response)
-          : ollamaRes.data.response;
+        const reasoned =
+          typeof ollamaRes.data.response === "string"
+            ? JSON.parse(ollamaRes.data.response)
+            : ollamaRes.data.response;
 
-        if (reasoned?.detections) responsePayload.detections = reasoned.detections;
-        if (reasoned?.recommendation) responsePayload.recommendation = reasoned.recommendation;
+        if (reasoned?.detections)
+          responsePayload.detections = reasoned.detections;
+        if (reasoned?.recommendation)
+          responsePayload.recommendation = reasoned.recommendation;
         responsePayload.reasoning = reasoned;
-        responsePayload.source = 'local_edge+ollama';
-        await logFallbackEvent('vision', true, 'ollama_reasoning_success', { model: modelName });
+        responsePayload.source = "local_edge+ollama";
+        await logFallbackEvent("vision", true, "ollama_reasoning_success", {
+          model: modelName,
+        });
       } catch (oe) {
-        await logFallbackEvent('vision', false, 'ollama_reasoning_error', { error: String(oe?.message || oe) });
+        await logFallbackEvent("vision", false, "ollama_reasoning_error", {
+          error: String(oe?.message || oe),
+        });
         responsePayload.ollamaError = String(oe?.message || oe);
       }
     }
 
     const geminiKey = process.env.GEMINI_API_KEY;
-    const canFallback = VISION_FALLBACK_ENABLED && canUseGeminiFallback('vision');
-    if ((!responsePayload.reasoning || responsePayload.ollamaError) && geminiKey && canFallback) {
+    const canFallback =
+      VISION_FALLBACK_ENABLED && canUseGeminiFallback("vision");
+    if (
+      (!responsePayload.reasoning || responsePayload.ollamaError) &&
+      geminiKey &&
+      canFallback
+    ) {
       try {
-        const modelName = process.env.GEMINI_MODEL || 'text-bison-001';
+        const modelName = process.env.GEMINI_MODEL || "text-bison-001";
         const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generate?key=${geminiKey}`;
         const prompt = `You are a vision assistant. Return only JSON. Analyze the image data and provided edge metadata, then return detections, recommendation, and notes. Image metadata: ${JSON.stringify(edgeAnalysis.metadata)}.`;
         const payload = {
@@ -331,31 +376,45 @@ router.post('/vision', async (req, res) => {
           maxOutputTokens: 512,
         };
 
-        const gemRes = await axios.post(url, payload, { timeout: VISION_GEMINI_TIMEOUT_MS });
-        const textOutput = (gemRes.data?.candidates && gemRes.data.candidates[0]?.content) || gemRes.data?.output || gemRes.data;
+        const gemRes = await axios.post(url, payload, {
+          timeout: VISION_GEMINI_TIMEOUT_MS,
+        });
+        const textOutput =
+          (gemRes.data?.candidates && gemRes.data.candidates[0]?.content) ||
+          gemRes.data?.output ||
+          gemRes.data;
 
         try {
-          const parsed = typeof textOutput === 'string' ? JSON.parse(textOutput) : textOutput;
-          if (parsed?.detections) responsePayload.detections = parsed.detections;
-          if (parsed?.recommendation) responsePayload.recommendation = parsed.recommendation;
+          const parsed =
+            typeof textOutput === "string"
+              ? JSON.parse(textOutput)
+              : textOutput;
+          if (parsed?.detections)
+            responsePayload.detections = parsed.detections;
+          if (parsed?.recommendation)
+            responsePayload.recommendation = parsed.recommendation;
           responsePayload.gemini = parsed;
-          responsePayload.source = 'local_edge+gemini';
+          responsePayload.source = "local_edge+gemini";
         } catch (parseErr) {
           responsePayload.gemini = { raw: textOutput };
         }
-        responsePayload.fallback = 'gemini';
-        await logFallbackEvent('vision', true, 'gemini_success', { model: modelName });
+        responsePayload.fallback = "gemini";
+        await logFallbackEvent("vision", true, "gemini_success", {
+          model: modelName,
+        });
       } catch (ge) {
-        await logFallbackEvent('vision', false, 'gemini_error', { error: String(ge?.message || ge) });
+        await logFallbackEvent("vision", false, "gemini_error", {
+          error: String(ge?.message || ge),
+        });
         responsePayload.geminiError = String(ge?.message || ge);
       }
     } else if (geminiKey && !canFallback) {
-      await logFallbackEvent('vision', false, 'gemini_rate_limit', {});
+      await logFallbackEvent("vision", false, "gemini_rate_limit", {});
     }
 
     return res.json(responsePayload);
   } catch (err: any) {
-    console.error('Vision stub error:', err);
+    console.error("Vision stub error:", err);
     return res.status(500).json({ error: String(err?.message || err) });
   }
 });
@@ -395,9 +454,9 @@ async function saveChatLog(prompt: string, result: any, req: any) {
 }
 
 // G-Code validation currently disabled for local-only deployments
-router.post('/gcode/validate', async (_req, res) => {
+router.post("/gcode/validate", async (_req, res) => {
   res.status(501).json({
-    error: 'G-Code validation is disabled in this local-only configuration.',
+    error: "G-Code validation is disabled in this local-only configuration.",
   });
 });
 
