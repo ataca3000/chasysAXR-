@@ -2,11 +2,13 @@
   "name": "gopilot-monorepo",
   "private": true,
   "workspaces": [
-    "apps/*"
+    "apps/industrial-control"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "dev": "npm run dev --workspaces",
+    "build": "npm --workspace apps/industrial-control run build",
+    "dev": "npm --workspace apps/industrial-control run dev",
+    "build:industrial-control": "npm --workspace apps/industrial-control run build",
+    "dev:industrial-control": "npm --workspace apps/industrial-control run dev",
     "clean": "rimraf node_modules apps/*/node_modules apps/*/dist apps/*/build .turbo"
   },
   "dependencies": {

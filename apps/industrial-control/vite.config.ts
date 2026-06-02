@@ -1,22 +1,22 @@
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue' // cámbialo por react o svelte si aplica
-import path from 'path'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   build: {
-    outDir: 'dist',
+    outDir: "dist",
     sourcemap: false,
     rollupOptions: {
-      input: path.resolve(__dirname, 'index.html'),
+      input: path.resolve(__dirname, "index.html"),
     },
   },
   optimizeDeps: {
-    exclude: ['server.ts'], // evita que Vite intente procesarlo
+    exclude: ["server.ts"], // evita que Vite intente procesarlo
   },
-})
+});
