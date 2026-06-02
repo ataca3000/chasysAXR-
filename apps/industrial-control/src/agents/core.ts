@@ -6,7 +6,7 @@ import { useAgentStore } from "../store/state";
 
 const AgentCommandSchema = z.object({
   type: z.enum(["serial", "usb", "ai"]),
-  payload: z.record(z.any()).optional(),
+  payload: z.record(z.string(), z.any()).optional(),
 });
 
 export type AgentCommand = z.infer<typeof AgentCommandSchema>;
@@ -17,7 +17,7 @@ export type AgentCommandResult = {
 };
 
 export async function dispatchAgentCommand(
-  command: AgentCommand
+  command: AgentCommand,
 ): Promise<AgentCommandResult | void> {
   const parsed = AgentCommandSchema.parse(command);
   const store = useAgentStore.getState();

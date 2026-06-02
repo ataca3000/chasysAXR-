@@ -16,7 +16,7 @@ export function normalizeSensorData(raw: any, source: string) {
     power: "power",
   };
 
-  const normalized: any = {};
+  const normalized: Record<string, number> = {};
   for (const key in raw) {
     const lower = key.toLowerCase();
     if (typeMap[lower]) {

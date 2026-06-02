@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./ui/App.tsx";
+import App from "./ui/App";
 import { initAwareness } from "./awareness";
 import "./styles.css";
 

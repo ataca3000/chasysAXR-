@@ -1,4 +1,4 @@
-import { getSituationalState, SensorReading } from "./state";
+import { getSituationalState, SensorReading, MachineState } from "./state";
 
 export function buildSituationalPrompt() {
   const state = getSituationalState();

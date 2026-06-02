@@ -22,8 +22,10 @@ export function extractModelMetadata(object: THREE.Object3D) {
   const metadata: any[] = [];
 
   object.traverse((node) => {
-    if (node.isMesh || (node.isGroup && node.name)) {
-      const box = new THREE.Box3().setFromObject(node);
+    const isMesh = (node as THREE.Mesh).isMesh;
+    const isGroup = (node as THREE.Group).isGroup;
+    if (isMesh || (isGroup && node.name)) {
+      const box = new THREE.Box3().setFromObject(node as THREE.Object3D);
       const size = new THREE.Vector3();
       box.getSize(size);
 

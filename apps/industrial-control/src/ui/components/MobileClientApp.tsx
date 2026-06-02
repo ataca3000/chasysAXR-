@@ -32,7 +32,7 @@ export function MobileClientApp() {
       const video = document.createElement("video");
       const scanner = new QrScanner(
         video,
-        (result) => handleQRScanned(result.data),
+        (result: any) => handleQRScanned(result.data),
         { returnDetailedScanResult: false },
       );
       qrScannerRef.current = scanner;
