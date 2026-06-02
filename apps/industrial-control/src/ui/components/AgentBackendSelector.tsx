@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { checkLocalBackendHealth } from '../../services/agentBackend';
 
 export function AgentBackendSelector() {
-  const [backend, setBackend] = useState<string>(() => localStorage.getItem('agentBackend') || (import.meta.env.VITE_AGENT_BACKEND as any) || 'gemini');
+  const [backend, setBackend] = useState<string>(() => localStorage.getItem('agentBackend') || (import.meta.env.VITE_AGENT_BACKEND as any) || 'ollama');
   const [model, setModel] = useState<string>(() => localStorage.getItem('agentBackendModel') || (import.meta.env.VITE_OLLAMA_MODEL as any) || 'mistral');
   const [localHealthy, setLocalHealthy] = useState<boolean | null>(null);
 
@@ -28,13 +28,12 @@ export function AgentBackendSelector() {
       <h4 className="text-xs text-google-blue font-mono font-bold uppercase mb-2">Agent Backend</h4>
       <div className="flex gap-2 items-center">
         <select value={backend} onChange={(e) => save(e.target.value, model)} className="p-2 bg-black/40 text-sm">
-          <option value="gemini">Gemini (Cloud)</option>
           <option value="ollama">Ollama (Local)</option>
           <option value="local">Local (Proxy)</option>
         </select>
 
         <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="model (ej: mistral)" className="p-2 bg-black/40 text-sm flex-1" />
-        <button onClick={() => save(backend, model)} className="px-3 py-2 bg-google-blue text-white text-xs">Guardar</button>
+        <button onClick={() => save(backend, model)} className="px-3 py-2 bg-emerald-600 text-white text-xs">Guardar</button>
       </div>
 
       {localHealthy !== null && (
@@ -44,7 +43,7 @@ export function AgentBackendSelector() {
       )}
 
       <div className="mt-2 text-[10px] text-slate-400">
-        Use local Ollama for privacy; Gemini offers broader reasoning and coverage. Start Ollama on port 11434 for local use.
+        Usa Ollama local para privacidad y disponibilidad. Inicia Ollama en el puerto 11434 para que funcione correctamente.
       </div>
     </div>
   );

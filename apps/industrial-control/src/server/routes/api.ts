@@ -1,9 +1,4 @@
 import { Router } from "express";
-import {
-  VertexAI,
-  HarmCategory,
-  HarmBlockThreshold,
-} from "@google-cloud/vertexai";
 import dotenv from "dotenv";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -17,15 +12,6 @@ import { db } from "./firebase"; // Corregido para usar el archivo en la misma c
 dotenv.config();
 
 const router = Router();
-
-// Inicialización de Vertex AI (Enterprise Grade)
-let vertexAI: VertexAI | null = null;
-if (process.env.GOOGLE_CLOUD_PROJECT) {
-  vertexAI = new VertexAI({
-    project: process.env.GOOGLE_CLOUD_PROJECT,
-    location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
-  });
-}
 
 // Helper para registrar/actualizar usuarios en Firestore
 async function syncUserToDb(user: {
@@ -132,170 +118,19 @@ router.post("/chat", async (req, res) => {
       }
     }
 
-    // Intento 2: Vertex AI (Enterprise Cloud)
-    if (!result && vertexAI) {
-      if (!process.env.GOOGLE_CLOUD_PROJECT) {
-        return res.status(500).json({ error: "Cloud AI not configured." });
-      }
-
-      const generativeModel = vertexAI.getGenerativeModel({
-        model: "gemini-1.5-pro",
-        systemInstruction: `Eres Jarvis, un ingeniero de sistemas expertos en Gemelos Digitales e Industria 4.0.
-Tu objetivo es gestionar ensambles mecánicos complejos y actuadores dinámicos (brazos robóticos, CNC, láser, extrusores).
-El usuario te dará instrucciones en lenguaje natural para realizar tareas de ensamblaje, manipulación o programación.
-Tu tarea es interpretar estas instrucciones y generar una secuencia de 'actions' (acciones) que el hardware físico o el gemelo digital puedan ejecutar.
-
-Considera los siguientes tipos de acciones:
-- 'move_robot_arm': Mover un brazo robótico a una posición (x, y, z) con una orientación (rx, ry, rz).
-- 'pick_part': Recoger una pieza por su ID.
-- 'place_part': Colocar una pieza por su ID en una posición (x, y, z).
-- 'execute_gcode': Enviar un comando G-Code directamente al hardware.
-- 'set_tool_state': Encender/apagar una herramienta (ej. láser, gripper, husillo) o ajustar su potencia/velocidad.
-- 'update_digital_twin': Actualizar la representación visual de componentes en el gemelo digital.
-
-Siempre devuelve un JSON que contenga un 'message' conversacional y un array de 'actions'.
-Si el usuario menciona un componente específico (ej. "motor_X", "brazo_robotico_1"), usa su ID.
-Si el usuario carga un modelo CAD (ej. GLB/STP), asume que los componentes tienen IDs y propiedades.
-Prioriza la seguridad industrial y la eficiencia. Si una acción es peligrosa o inviable, explícalo en el 'message'.
-No te limites a formas básicas; interpreta IDs de componentes reales y sus propiedades.
-Si el usuario cambia el 'cabezal' (tool), ajusta los parámetros de telemetría sugeridos.
-
-Ejemplo de respuesta:
-{ "message": "Moví el brazo robótico a la posición de ensamblaje.", "actions": [ { "type": "move_robot_arm", "params": { "x": 100, "y": 50, "z": 20, "rx": 0, "ry": 0, "rz": 90 } }, { "type": "pick_part", "params": { "partId": "pieza_A" } } ] }
-`,
-        safetySettings: [
-          {
-            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-          },
-        ],
-      });
-
-      const userContent = {
-        role: "user",
-        parts: [
-          {
-            text: `User Prompt: ${prompt} \n HISTORY: ${JSON.stringify(history)} \n STATE: ${JSON.stringify(currentScene)}`,
-          },
-        ],
-      };
-
-      const streamingResp = await generativeModel.generateContentStream({
-        contents: [userContent],
-        generationConfig: {
-          maxOutputTokens: 2048,
-          temperature: 0.2, // Baja temperatura para mayor precisión técnica
-          topP: 0.8,
-          responseMimeType: "application/json",
-          // @ts-ignore - Vertex SDK schema structure
-          responseSchema: {
-            type: "object",
-            properties: {
-              message: {
-                type: "string",
-                description:
-                  "Your conversational response as the industrial assistant.",
-              },
-              actions: {
-                type: "array",
-                description:
-                  "List of actions to be executed by the hardware or digital twin.",
-                items: {
-                  type: "object",
-                  properties: {
-                    type: {
-                      type: "string",
-                      enum: [
-                        "move_robot_arm",
-                        "pick_part",
-                        "place_part",
-                        "execute_gcode",
-                        "set_tool_state",
-                        "update_digital_twin",
-                      ],
-                      description: "Type of action to perform.",
-                    },
-                    params: {
-                      type: "object",
-                      description: "Parameters for the action.",
-                      properties: {
-                        // Common parameters for robot movement
-                        x: { type: "number" },
-                        y: { type: "number" },
-                        z: { type: "number" },
-                        rx: { type: "number" },
-                        ry: { type: "number" },
-                        rz: { type: "number" },
-                        // Parameters for part manipulation
-                        partId: { type: "string" },
-                        gripperForce: { type: "number" },
-                        // Parameters for G-code execution
-                        gcode: { type: "string" },
-                        // Parameters for tool state
-                        toolId: { type: "string" },
-                        state: {
-                          type: "string",
-                          enum: ["on", "off", "set_power", "set_speed"],
-                        },
-                        value: { type: "number" }, // For power/speed
-                        // Parameters for digital twin updates (similar to old shapes)
-                        shapes: {
-                          type: "array",
-                          items: {
-                            type: "object",
-                            properties: {
-                              /* existing shape properties */
-                            },
-                            required: [
-                              "id",
-                              "type",
-                              "position",
-                              "rotation",
-                              "scale",
-                              "color",
-                            ],
-                          },
-                        },
-                      },
-                    },
-                  },
-                  required: ["type", "params"],
-                },
-              },
-            },
-            required: ["message", "actions"],
-          },
-        },
-      });
-
-      try {
-        let fullText = "";
-        for await (const item of streamingResp.stream) {
-          const chunk = item.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          fullText += chunk;
-        }
-
-        result = JSON.parse(fullText || "{}");
-
-        // IMPORTANTE: Después de cerrar el stream, guardamos en DB y salimos
-        await saveChatLog(prompt, result, req);
-        return res.json({ result });
-      } catch (streamError) {
-        console.error("Stream handling error:", streamError);
-        return res.status(500).json({ error: "Stream error" });
-      }
+    if (!result) {
+      return res.status(500).json({ error: 'No local AI backend is available. Inicia Ollama localmente en el puerto 11434.' });
     }
 
-    // Si no fue streaming (ej. Ollama), enviamos respuesta normal
     if (result) {
       await saveChatLog(prompt, result, req);
       return res.json({ result });
     }
 
-    res.status(404).json({ error: "No response generated" });
+    res.status(404).json({ error: 'No response generated' });
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    res.status(500).json({ error: "Failed to process request." });
+    console.error('AI chat API Error:', error);
+    res.status(500).json({ error: 'Failed to process request.' });
   }
 });
 
@@ -333,61 +168,11 @@ async function saveChatLog(prompt: string, result: any, req: any) {
   }
 }
 
-// Nuevo Agente especializado en G-Code y Trayectorias CNC
-router.post("/gcode/validate", async (req, res) => {
-  try {
-    const { gcode, machineConfig } = req.body;
-    const model = vertexAI.getGenerativeModel({
-      model: "gemini-1.5-pro",
-      systemInstruction:
-        "Eres un validador experto de trayectorias para actuadores industriales. Valida el G-Code adaptándote al tipo de herramienta instalada (Husillo, Extrusor, Láser, Brazo Robótico o Actuador personalizado). Proporciona un análisis de seguridad y eficiencia.",
-    });
-
-    const response = await model.generateContent({
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: `Analiza el siguiente bloque de G-Code para una máquina con estos límites: ${JSON.stringify(machineConfig)}.
-          
-G-CODE:
-${gcode}`,
-            },
-          ],
-        },
-      ],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "object",
-          properties: {
-            isValid: { type: "boolean" },
-            errors: {
-              type: "array",
-              items: { type: "string" },
-              description: "Errores críticos que impedirían la ejecución.",
-            },
-            bounds: { type: "object" },
-            estimatedTimeMinutes: { type: "number" },
-            trajectoryPoints: {
-              type: "array",
-              items: { type: "array", items: { type: "number" } },
-            },
-          },
-          required: ["isValid", "errors", "bounds"],
-        },
-      },
-    });
-
-    const result = JSON.parse(
-      response.response.candidates?.[0].content.parts[0].text || "{}",
-    );
-    res.json({ result });
-  } catch (error) {
-    console.error("G-Code Validation Error:", error);
-    res.status(500).json({ error: "Failed to validate G-Code." });
-  }
+// G-Code validation currently disabled for local-only deployments
+router.post('/gcode/validate', async (_req, res) => {
+  res.status(501).json({
+    error: 'G-Code validation is disabled in this local-only configuration.',
+  });
 });
 
 // S3 presign endpoint (server-side). The frontend should call this to get a PUT presigned URL.

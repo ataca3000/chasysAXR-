@@ -13,7 +13,7 @@ import {
   Bot,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { getAgentRecommendations } from "../services/geminiService";
+import { getRecommendations } from "../services/agentBackend";
 import { useOnboardingState } from "../hooks/useOnboardingState";
 import { OllamaSetupGuide } from "./components/OllamaSetupGuide";
 import { ARCameraLayer } from "./components/ARCameraLayer";
@@ -107,11 +107,11 @@ function AppContent() {
     try {
       const status =
         currentTelemetry.temperature > 800 ? "ALERTA CRÍTICA" : "NORMAL";
-      const insights = await getAgentRecommendations(currentTelemetry, status);
+      const insights = await getRecommendations(currentTelemetry, status);
       setAiInsights(insights);
     } catch (err: any) {
       telemetryStore.setSystemError(
-        err.message || "Error occurred while contacting Gemini AI.",
+        err.message || "Error occurred while contacting the local AI model.",
       );
       setAiInsights({
         html: '<p class="text-rose-600">Analysis failed due to connection error. Please try again.</p>',

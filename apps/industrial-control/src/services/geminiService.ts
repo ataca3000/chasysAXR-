@@ -1,19 +1,10 @@
-import { GoogleGenAI } from '@google/genai';
-
-const ai = new GoogleGenAI({
-  apiKey: 'DUMMY_GEMINI_KEY', // Replaced securely by the local server proxy
-  httpOptions: {
-    baseUrl: window.location.origin + '/api/gemini'
-  }
-});
-
 export async function getAgentRecommendations(
   telemetry: any,
-  machineStatus: string
+  machineStatus: string,
 ): Promise<{ html: string; gcode: string[] }> {
   const prompt = `Eres un Agente de IA Industrial Experto operando un panel de control avanzado para fresadoras CNC y cortadoras de plasma.
 Estás monitoreando sensores térmicos y láser en tiempo real de una línea de producción.
-    
+
 Datos de Telemetría Actual:
 - Estado General: ${machineStatus}
 - Temperatura de Husillo/Cabezal: ${telemetry.temperature}°C (Peligro > 800°C)
@@ -23,33 +14,47 @@ Datos de Telemetría Actual:
 Proporciona un análisis en formato JSON estricto con las siguientes claves:
 {
   "html": "El análisis estructurado en HTML (solo etiquetas <b>, <ul>, <li>, <p> sin clase, sin formato markdown \`\`\`) detallando predicción de fallos y mantenimiento.",
-  "gcode": ["M05", "G04 P2000"] // Un arreglo (array) de strings, cada uno un comando de código G (G-code) para acciones correctivas, o un arreglo vacío si no se necesita.
+  "gcode": ["M05", "G04 P2000"]
 }
 
 Sé muy técnico, conciso y responde en español como un sistema proactivo. No incluyas nada más que el JSON.`;
 
+  const model =
+    localStorage.getItem('agentBackendModel') ||
+    import.meta.env.VITE_OLLAMA_MODEL ||
+    'mistral';
+
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash',
-      contents: prompt,
-      config: { responseMimeType: "application/json" }
+    const response = await fetch('/api/ollama/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        prompt,
+        format: 'json',
+        stream: false,
+      }),
     });
-    
-    if (response.text) {
-        try {
-          const parsed = JSON.parse(response.text);
-          return {
-              html: typeof parsed.html === 'string' ? parsed.html : '<p>Análisis completado pero sin formato esperado.</p>',
-              gcode: Array.isArray(parsed.gcode) ? parsed.gcode.slice(0, 50) : [] // Limit to 50 commands for safety
-          };
-        } catch (parseError) {
-          console.error('Failed to parse Gemini response as JSON:', response.text);
-          return { html: '<p>Error de procesamiento: La IA devolvió un formato inválido.</p>', gcode: [] };
-        }
+
+    if (!response.ok) {
+      throw new Error(`Local model error ${response.status}`);
     }
-    return { html: '<p>No se pudo generar el análisis. Sin respuesta del motor.</p>', gcode: [] };
+
+    const data = await response.json();
+    return {
+      html:
+        typeof data.html === 'string'
+          ? data.html
+          : typeof data.output === 'string'
+          ? data.output
+          : '<p>Respuesta vacía del modelo local.</p>',
+      gcode: Array.isArray(data.gcode) ? data.gcode : [],
+    };
   } catch (error: any) {
-    console.error('Error fetching Gemini recommendations:', error);
-    throw new Error(`Error en la comunicación con el servicio de IA: ${error.message || 'Desconocido'}`);
+    console.error('Error fetching local model recommendations:', error);
+    return {
+      html: '<p>Error en la comunicación con el modelo local.</p>',
+      gcode: [],
+    };
   }
 }

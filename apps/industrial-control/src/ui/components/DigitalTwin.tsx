@@ -462,7 +462,7 @@ export const CustomCNC = memo(function CustomCNC({ position, label, telemetry, a
       </Html>
     </group>
   );
-}
+});
 
 /**
  * Componente para visualización de modelos industriales externos.
