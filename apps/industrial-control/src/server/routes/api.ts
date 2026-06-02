@@ -7,6 +7,7 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { networkInterfaces } from "os";
 import { exec } from "child_process";
+import Jimp from "jimp";
 import { db } from "./firebase"; // Corregido para usar el archivo en la misma carpeta
 
 dotenv.config();
@@ -44,6 +45,108 @@ const s3Client = new S3Client({
       }
     : undefined,
 });
+
+const CHAT_FALLBACK_ENABLED = process.env.CHAT_USE_GEMINI_FALLBACK !== "false";
+const VISION_FALLBACK_ENABLED = process.env.VISION_USE_GEMINI_FALLBACK !== "false";
+const VISION_OLLAMA_REASONING_ENABLED = process.env.VISION_USE_OLLAMA_REASONING !== "false";
+const GEMINI_TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS || 15000);
+const VISION_GEMINI_TIMEOUT_MS = Number(process.env.VISION_GEMINI_TIMEOUT_MS || 20000);
+const VISION_OLLAMA_TIMEOUT_MS = Number(process.env.VISION_OLLAMA_TIMEOUT_MS || 15000);
+const GEMINI_FALLBACK_MAX_PER_MINUTE = Math.max(1, Number(process.env.GEMINI_FALLBACK_MAX_PER_MINUTE || 20));
+
+const geminiFallbackMeter: Record<"chat" | "vision", { count: number; windowStart: number }> = {
+  chat: { count: 0, windowStart: Date.now() },
+  vision: { count: 0, windowStart: Date.now() },
+};
+
+function canUseGeminiFallback(endpoint: "chat" | "vision") {
+  const entry = geminiFallbackMeter[endpoint];
+  const now = Date.now();
+  if (now - entry.windowStart > 60_000) {
+    entry.count = 0;
+    entry.windowStart = now;
+  }
+
+  if (entry.count >= GEMINI_FALLBACK_MAX_PER_MINUTE) {
+    return false;
+  }
+
+  entry.count += 1;
+  return true;
+}
+
+async function analyzeImageEdge(imageBase64: string) {
+  const base64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+  const buffer = Buffer.from(base64, "base64");
+  const image = await Jimp.read(buffer);
+
+  const width = image.getWidth();
+  const height = image.getHeight();
+  const sampleStep = 10;
+  let totalBrightness = 0;
+  let darkPixels = 0;
+  let totalSamples = 0;
+
+  for (let y = 0; y < height; y += sampleStep) {
+    for (let x = 0; x < width; x += sampleStep) {
+      const idx = image.getPixelIndex(x, y);
+      const r = image.bitmap.data[idx + 0];
+      const g = image.bitmap.data[idx + 1];
+      const b = image.bitmap.data[idx + 2];
+      const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      totalBrightness += brightness;
+      if (brightness < 0.25) darkPixels += 1;
+      totalSamples += 1;
+    }
+  }
+
+  const averageBrightness = totalBrightness / Math.max(1, totalSamples);
+  const darkRatio = darkPixels / Math.max(1, totalSamples);
+  const defectLikely = darkRatio > 0.2 || averageBrightness < 0.3;
+
+  return {
+    metadata: {
+      width,
+      height,
+      imageFormat: image.getMIME(),
+      averageBrightness: Number(averageBrightness.toFixed(3)),
+      darkRatio: Number(darkRatio.toFixed(3)),
+      defectLikely,
+    },
+    detections: [
+      {
+        label: defectLikely ? "potential_defect" : "operational_area",
+        confidence: defectLikely ? Number(Math.min(0.98, 0.5 + darkRatio).toFixed(2)) : Number(Math.max(0.6, averageBrightness).toFixed(2)),
+        bbox: [0, 0, 1, 1],
+      },
+    ],
+  };
+}
+
+async function logFallbackEvent(
+  endpoint: "chat" | "vision",
+  success: boolean,
+  reason: string,
+  details?: Record<string, unknown>,
+) {
+  const logEntry = {
+    endpoint,
+    success,
+    reason,
+    details: details || {},
+    timestamp: new Date(),
+  };
+
+  if (db) {
+    try {
+      await db.collection("fallback_logs").add(logEntry);
+    } catch (err) {
+      console.warn("Could not persist fallback log:", err);
+    }
+  } else {
+    console.log("Fallback event:", logEntry);
+  }
+}
 
 router.get("/health", (_req, res) => {
   res.json({ status: "ok" });
@@ -118,12 +221,12 @@ router.post("/chat", async (req, res) => {
       }
     }
 
-    // If Ollama did not produce a result, try Gemini fallback if configured
+    // If Ollama did not produce a result, try Gemini fallback if configured and enabled
     if (!result) {
       const geminiKey = process.env.GEMINI_API_KEY;
-      if (geminiKey) {
+      const canFallback = CHAT_FALLBACK_ENABLED && canUseGeminiFallback("chat");
+      if (geminiKey && canFallback) {
         try {
-          // Quick fallback to Google Generative Language REST API (basic usage)
           const modelName = process.env.GEMINI_MODEL || "text-bison-001";
           const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generate?key=${geminiKey}`;
           const payload = {
@@ -132,15 +235,17 @@ router.post("/chat", async (req, res) => {
             maxOutputTokens: 512,
           };
 
-          const gemRes = await axios.post(url, payload, { timeout: 15000 });
+          const gemRes = await axios.post(url, payload, { timeout: GEMINI_TIMEOUT_MS });
 
-          // Try to extract a reasonable text result; if uncertain, attach full response
           const textOutput = (gemRes.data?.candidates && gemRes.data.candidates[0]?.content) || gemRes.data?.output || gemRes.data;
           result = { message: textOutput };
+          await logFallbackEvent("chat", true, "gemini_success", { model: modelName });
         } catch (ge) {
+          await logFallbackEvent("chat", false, "gemini_error", { error: String(ge?.message || ge) });
           console.warn("Gemini fallback failed:", ge?.message || ge);
-          // no-op, will return error below
         }
+      } else if (!canFallback && geminiKey) {
+        await logFallbackEvent("chat", false, "gemini_rate_limit", {});
       }
 
       if (!result) {
@@ -166,19 +271,89 @@ router.post('/vision', async (req, res) => {
     const { imageBase64 } = req.body || {};
     if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
 
-    // NOTE: This is a stub. Replace with real vision model call or edge detector.
-    // Example response simulating object detection + simple recommendation.
-    const detections = [
-      { label: 'object', confidence: 0.92, bbox: [0.12, 0.34, 0.2, 0.15] },
-      { label: 'defect', confidence: 0.67, bbox: [0.55, 0.2, 0.1, 0.18] },
-    ];
-
-    const recommendation = {
-      action: 'inspect',
-      reason: 'Detected potential defect with confidence > 0.6',
+    const edgeAnalysis = await analyzeImageEdge(imageBase64);
+    const responsePayload: any = {
+      ok: true,
+      source: 'local_edge',
+      edgeAnalysis,
+      detections: edgeAnalysis.detections,
+      recommendation: {
+        action: edgeAnalysis.metadata.defectLikely ? 'inspect' : 'monitor',
+        reason: edgeAnalysis.metadata.defectLikely
+          ? 'Low brightness or high dark pixel ratio detected in the image.'
+          : 'Image appears stable within the current lightweight edge analysis.',
+      },
+      reasoning: null,
+      fallback: null,
     };
 
-    return res.json({ ok: true, detections, recommendation });
+    const ollamaReasoningEnabled = VISION_OLLAMA_REASONING_ENABLED && process.env.VITE_OLLAMA_MODEL;
+    if (ollamaReasoningEnabled) {
+      try {
+        const modelName = process.env.VITE_OLLAMA_MODEL || 'mistral';
+        const prompt = `System: You are a vision assistant. Use the provided edge metadata to improve detections or recommendation. Return ONLY JSON with keys: detections, recommendation, notes. Edge metadata: ${JSON.stringify(edgeAnalysis.metadata)}. Detections: ${JSON.stringify(edgeAnalysis.detections)}.`;
+        const ollamaRes = await axios.post(
+          'http://localhost:11434/api/generate',
+          {
+            model: modelName,
+            prompt,
+            stream: false,
+            format: 'json',
+          },
+          { timeout: VISION_OLLAMA_TIMEOUT_MS },
+        );
+
+        const reasoned = typeof ollamaRes.data.response === 'string'
+          ? JSON.parse(ollamaRes.data.response)
+          : ollamaRes.data.response;
+
+        if (reasoned?.detections) responsePayload.detections = reasoned.detections;
+        if (reasoned?.recommendation) responsePayload.recommendation = reasoned.recommendation;
+        responsePayload.reasoning = reasoned;
+        responsePayload.source = 'local_edge+ollama';
+        await logFallbackEvent('vision', true, 'ollama_reasoning_success', { model: modelName });
+      } catch (oe) {
+        await logFallbackEvent('vision', false, 'ollama_reasoning_error', { error: String(oe?.message || oe) });
+        responsePayload.ollamaError = String(oe?.message || oe);
+      }
+    }
+
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const canFallback = VISION_FALLBACK_ENABLED && canUseGeminiFallback('vision');
+    if ((!responsePayload.reasoning || responsePayload.ollamaError) && geminiKey && canFallback) {
+      try {
+        const modelName = process.env.GEMINI_MODEL || 'text-bison-001';
+        const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generate?key=${geminiKey}`;
+        const prompt = `You are a vision assistant. Return only JSON. Analyze the image data and provided edge metadata, then return detections, recommendation, and notes. Image metadata: ${JSON.stringify(edgeAnalysis.metadata)}.`;
+        const payload = {
+          prompt: { text: prompt },
+          temperature: 0.1,
+          maxOutputTokens: 512,
+        };
+
+        const gemRes = await axios.post(url, payload, { timeout: VISION_GEMINI_TIMEOUT_MS });
+        const textOutput = (gemRes.data?.candidates && gemRes.data.candidates[0]?.content) || gemRes.data?.output || gemRes.data;
+
+        try {
+          const parsed = typeof textOutput === 'string' ? JSON.parse(textOutput) : textOutput;
+          if (parsed?.detections) responsePayload.detections = parsed.detections;
+          if (parsed?.recommendation) responsePayload.recommendation = parsed.recommendation;
+          responsePayload.gemini = parsed;
+          responsePayload.source = 'local_edge+gemini';
+        } catch (parseErr) {
+          responsePayload.gemini = { raw: textOutput };
+        }
+        responsePayload.fallback = 'gemini';
+        await logFallbackEvent('vision', true, 'gemini_success', { model: modelName });
+      } catch (ge) {
+        await logFallbackEvent('vision', false, 'gemini_error', { error: String(ge?.message || ge) });
+        responsePayload.geminiError = String(ge?.message || ge);
+      }
+    } else if (geminiKey && !canFallback) {
+      await logFallbackEvent('vision', false, 'gemini_rate_limit', {});
+    }
+
+    return res.json(responsePayload);
   } catch (err: any) {
     console.error('Vision stub error:', err);
     return res.status(500).json({ error: String(err?.message || err) });

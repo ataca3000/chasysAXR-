@@ -22,6 +22,7 @@ import { AssemblyLab } from "./components/AssemblyLab";
 import { MobileScanner } from "./components/MobileScanner";
 import { LocalModelManager } from "./components/LocalModelManager";
 import VisionTest from "./components/VisionTest";
+import AwarenessPanel from "./components/AwarenessPanel";
 import DigitalTwin from "./components/DigitalTwin";
 import { JarvisCompanion } from "./components/JarvisCompanion";
 import { CommandCenterView } from "./views/CommandCenterView";
@@ -225,6 +226,12 @@ function AppContent() {
               onClick={() => setActiveView("ai_models")}
               icon={<Cpu size={18} />}
               label="AI MODELS (LOCAL)"
+            />
+            <NavItem
+              active={activeView === "awareness"}
+              onClick={() => setActiveView("awareness")}
+              icon={<AlertTriangle size={18} />}
+              label="SITUATIONAL"
             />
             <NavItem
               active={activeView === "jarvis_companion"}
@@ -446,6 +453,12 @@ function AppContent() {
                   <LocalModelManager />
                   <VisionTest />
                 </div>
+              </div>
+            )}
+
+            {activeView === "awareness" && (
+              <div className="xl:col-span-3">
+                <AwarenessPanel />
               </div>
             )}
 

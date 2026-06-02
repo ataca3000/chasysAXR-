@@ -46,7 +46,8 @@
     "vite": "^6.2.3",
     "ws": "^8.20.1",
     "zod": "^4.4.3",
-    "zustand": "^5.0.13"
+    "zustand": "^5.0.13",
+    "jimp": "^1.0.0"
   },
   "devDependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
