@@ -5,7 +5,7 @@
       "src": "apps/industrial-control/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "apps/industrial-control/dist"
+        "distDir": "dist"
       }
     },
     {
