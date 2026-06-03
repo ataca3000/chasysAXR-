@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+  <!-- Página principal -->
+  <url>
+    <loc>https://ataca3000.github.io/GoPilot-iAgnt-Whitepaper/</loc>
+    <lastmod>2026-06-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- Whitepaper -->
+  <url>
+    <loc>https://ataca3000.github.io/GoPilot-iAgnt-Whitepaper/WHITEPAPER.html</loc>
+    <lastmod>2026-06-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Palabras clave indexables -->
+  <url>
+    <loc>https://ataca3000.github.io/GoPilot-iAgnt-Whitepaper/?q=GoPilot</loc>
+  </url>
+  <url>
+    <loc>https://ataca3000.github.io/GoPilot-iAgnt-Whitepaper/?q=iAgnt</loc>
+  </url>
+  <url>
+    <loc>https://ataca3000.github.io/GoPilot-iAgnt-Whitepaper/?q=ENSANBLE-CREATORS</loc>
+  </url>
+  <url>
+    <loc>https://ataca3000.github.io/GoPilot-iAgnt-Whitepaper/?q=IA-industrial</loc>
+  </url>
+  <url>
+    <loc>https://ataca3000.github.io/GoPilot-iAgnt-Whitepaper/?q=WebXR</loc>
+  </url>
+  <url>
+    <loc>https://ataca3000.github.io/GoPilot-iAgnt-Whitepaper/?q=gemelo-digital</loc>
+  </url>
+  <url>
+    <loc>https://ataca3000.github.io/GoPilot-iAgnt-Whitepaper/?q=control-por-voz</loc>
+  </url>
+  <url>
+    <loc>https://ataca3000.github.io/GoPilot-iAgnt-Whitepaper/?q=modelos-locales</loc>
+  </url>
+  <url>
+    <loc>https://ataca3000.github.io/GoPilot-iAgnt-Whitepaper/?q=simulacion-3D</loc>
+  </url>
+
+</urlset>
