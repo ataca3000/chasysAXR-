@@ -23,7 +23,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/apps/industrial-control/dist/index.html"
+      "dest": "/index.html"
     }
   ]
 }
