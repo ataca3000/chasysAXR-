@@ -1,3 +1,49 @@
+# ⚙️ GoPilot INDUSTRIAL Agent — GitHub App
+
+GoPilot INDUSTRIAL Agent es una integración avanzada para automatizar flujos industriales, análisis de repositorios, generación de PRs, ejecución de pipelines y control de agentes IA conectados a hardware real.
+
+## 🚀 Características principales
+- Automatización de pipelines industriales
+- Análisis de repositorios en tiempo real
+- Generación automática de Pull Requests
+- Integración con agentes IA y Digital Twins
+- Webhooks seguros con HMAC SHA256
+- Compatible con PLCs, Raspberry Pi y dispositivos edge
+
+## 🛠️ Permisos utilizados
+- **Contents:** Read & Write  
+- **Actions:** Read & Write  
+- **Issues:** Read & Write  
+- **Pull Requests:** Read & Write  
+- **Email:** Read-only  
+
+## 🔔 Eventos soportados
+- push  
+- pull_request  
+- issues  
+- workflow_run  
+- installation  
+- installation_repositories  
+
+## 📦 Instalación
+1. Instala la app desde GitHub Marketplace  
+2. Selecciona los repositorios a monitorear  
+3. Accede al panel de control:  
+   https://gopilot-industrial.vercel.app/dashboard/setup
+
+## 🧩 Webhook
+La app envía eventos a:https://gopilot-industrial.vercel.app/api/github/webhook
+## 🧠 Integración con IA
+GoPilot INDUSTRIAL permite:
+- Control de hardware
+- Digital Twins 3D
+- Automatización inteligente
+- Análisis de código con agentes IA
+
+## 📄 Licencia
+MIT
+
+
 “Sistema Ciberfísico Integrado para Control Industrial, Prototipado Inteligente y Supervisión Predictiva Multiplataforma – LFDS” es una plataforma de automatización que combina un módulo de control tipo PLC‑lite con una aplicación web multiplataforma capaz de monitorear, simular y operar procesos industriales en tiempo real. El sistema integra sensores, actuadores, gemelo digital 3D y herramientas de prototipado asistidas por inteligencia artificial para análisis, optimización y prevención de riesgos operativos, permitiendo incluso anticipar condiciones peligrosas mediante supervisión predictiva. Su arquitectura distribuida permite operar desde computadoras, navegadores y dispositivos móviles de baja gama, convirtiéndolo en un laboratorio ciberfísico portátil para control, simulación y seguridad industrial avanzada.# EBSAMBLE CREATORS  CON GoPilot iAgnt — Industrial AI & Digital Twin Framework GoPilot iAgnt — ENSANBLE CREATORSEl centro de control definitivo para creadores de hardware, impresión 3D y robótica basada en Arduino
 
 ![Release](https://img.shields.io/badge/release-v1.0.0-blue.svg)
