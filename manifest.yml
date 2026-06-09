@@ -1,0 +1,24 @@
+name: GoPilot INDUSTRIAL Agent
+url: https://gopilot-industrial.vercel.app
+hook_attributes:
+  url: https://gopilot-industrial.vercel.app/api/github/webhook
+redirect_url: https://gopilot-industrial.vercel.app/auth/github/callback
+callback_urls:
+  - https://gopilot-industrial.vercel.app/auth/github/callback
+public: true
+default_permissions:
+  contents: write
+  metadata: read
+  actions: write
+  issues: write
+  pull_requests: write
+  emails: read
+default_events:
+  - push
+  - pull_request
+  - issues
+  - workflow_run
+  - installation
+  - installation_repositories
+setup_url: https://gopilot-industrial.vercel.app/dashboard/setup
+setup_on_update: true
