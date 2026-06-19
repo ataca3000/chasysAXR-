@@ -31,7 +31,7 @@
     "dotenv": "^17.4.2",
     "express": "^4.22.2",
     "express-session": "^1.17.3",
-    "firebase": "^12.12.1",
+    "firebase": "^12.15.0",
     "http-proxy-middleware": "^4.1.0",
     "nodemailer": "^8.0.10",
     "lucide-react": "^1.18.0",
