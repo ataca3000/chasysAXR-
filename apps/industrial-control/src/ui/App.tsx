@@ -133,7 +133,7 @@ function AppContent() {
 
   return (
     <div
-      className={`min-h-screen bg-zinc-950 text-slate-300 font-sans flex flex-col md:flex-row overflow-hidden relative ${kioskMode ? "fixed inset-0 z-50 p-2 lg:p-4 bg-black" : ""}`}
+      className={`min-h-screen bg-zinc-950 text-slate-300 font-sans flex flex-col md:flex-row relative ${kioskMode ? "fixed inset-0 z-50 p-2 lg:p-4 bg-black overflow-hidden" : ""}`}
     >
       <AnimatePresence>
         {systemError && (
@@ -175,7 +175,7 @@ function AppContent() {
 
       {/* Sidebar - Hidden in Kiosk Mode for maximum space */}
       {!kioskMode && (
-        <aside className="w-full md:w-64 bg-black/40 backdrop-blur-xl border-b md:border-b-0 md:border-r border-white/10 flex flex-col p-3 md:p-4 shrink-0 z-10 shadow-sm relative">
+        <aside className="w-full md:w-64 bg-black/40 backdrop-blur-xl border-b md:border-b-0 md:border-r border-white/10 flex flex-col p-3 md:p-4 shrink-0 z-10 shadow-sm relative md:h-screen md:sticky md:top-0">
           <div className="flex items-center gap-3 mb-3 md:mb-8">
             <div className="w-10 h-10 bg-black/60 border border-white/10 rounded-lg flex items-center justify-center shadow-sm relative overflow-hidden">
               <Cpu className="text-google-blue w-6 h-6 relative z-10" />
@@ -384,7 +384,7 @@ function AppContent() {
           </div>
         </main>
       ) : (
-        <main className="flex-1 min-w-0 flex flex-col p-3 sm:p-4 md:p-6 overflow-y-auto h-screen custom-scrollbar z-10 relative">
+        <main className="flex-1 min-w-0 flex flex-col p-3 sm:p-4 md:p-6 overflow-y-visible md:overflow-y-auto h-auto md:h-screen custom-scrollbar z-10 relative">
           {/* Header Actions */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 md:mb-6 shrink-0 z-10 relative">
             <div className="flex items-center gap-3">
