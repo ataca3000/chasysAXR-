@@ -133,7 +133,7 @@ function AppContent() {
 
   return (
     <div
-      className={`min-h-screen bg-zinc-950 text-slate-300 font-sans flex flex-col md:flex-row overflow-hidden relative ${kioskMode ? "fixed inset-0 z-50 p-2 lg:p-4 bg-black" : ""}`}
+      className={`min-h-screen bg-zinc-950 text-slate-300 font-sans flex flex-col md:flex-row relative ${kioskMode ? "fixed inset-0 z-50 p-2 lg:p-4 bg-black overflow-hidden" : ""}`}
     >
       <AnimatePresence>
         {systemError && (
@@ -175,8 +175,8 @@ function AppContent() {
 
       {/* Sidebar - Hidden in Kiosk Mode for maximum space */}
       {!kioskMode && (
-        <aside className="w-full md:w-64 bg-black/40 backdrop-blur-xl border-r border-white/10 flex flex-col p-4 shrink-0 z-10 shadow-sm relative">
-          <div className="flex items-center gap-3 mb-8">
+        <aside className="w-full md:w-64 bg-black/40 backdrop-blur-xl border-b md:border-b-0 md:border-r border-white/10 flex flex-col p-3 md:p-4 shrink-0 z-10 shadow-sm relative md:h-screen md:sticky md:top-0">
+          <div className="flex items-center gap-3 mb-3 md:mb-8">
             <div className="w-10 h-10 bg-black/60 border border-white/10 rounded-lg flex items-center justify-center shadow-sm relative overflow-hidden">
               <Cpu className="text-google-blue w-6 h-6 relative z-10" />
             </div>
@@ -190,7 +190,7 @@ function AppContent() {
             </div>
           </div>
 
-          <nav className="flex flex-col gap-2 flex-grow">
+          <nav className="flex flex-row md:flex-col gap-2 flex-grow overflow-x-auto pb-1 md:pb-0">
             <NavItem
               active={activeView === "command_center"}
               onClick={() => setActiveView("command_center")}
@@ -241,7 +241,7 @@ function AppContent() {
             />
           </nav>
 
-          <div className="mt-auto relative z-10">
+          <div className="hidden md:block mt-auto relative z-10">
             <div
               className={`p-4 rounded-lg border ${isCritical ? "bg-black/60 border-google-red/50 shadow-[0_0_15px_rgba(234,67,53,0.15)]" : "bg-black/40 border-white/10"}`}
             >
@@ -384,16 +384,16 @@ function AppContent() {
           </div>
         </main>
       ) : (
-        <main className="flex-1 flex flex-col p-4 md:p-6 overflow-y-auto h-screen custom-scrollbar z-10 relative">
+        <main className="flex-1 min-w-0 flex flex-col p-3 sm:p-4 md:p-6 overflow-y-visible md:overflow-y-auto h-auto md:h-screen custom-scrollbar z-10 relative">
           {/* Header Actions */}
-          <div className="flex justify-between items-center mb-6 shrink-0 z-10 relative">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 md:mb-6 shrink-0 z-10 relative">
             <div className="flex items-center gap-3">
               {kioskMode && <Cpu className="text-slate-500 w-8 h-8" />}
-              <h2 className="text-2xl font-semibold tracking-tight text-white font-display uppercase text-neon-google">
+              <h2 className="text-lg sm:text-2xl font-semibold tracking-tight text-white font-display uppercase text-neon-google">
                 CNC TELEMETRY & SUPERVISION
               </h2>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={toggleKioskMode}
                 className={`px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 transition-all border ${
@@ -449,7 +449,7 @@ function AppContent() {
 
             {activeView === "ai_models" && (
               <div className="xl:col-span-3">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <LocalModelManager />
                   <VisionTest />
                 </div>
@@ -492,7 +492,7 @@ function NavItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition-all border font-mono font-medium tracking-wide ${
+      className={`w-max md:w-full flex shrink-0 items-center gap-2 md:gap-3 px-3 py-2.5 md:py-3 rounded-lg text-xs md:text-sm transition-all border font-mono font-medium tracking-wide ${
         active
           ? "bg-white/10 text-white border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.05)]"
           : "text-slate-400 border-transparent hover:bg-white/5 hover:text-slate-200"

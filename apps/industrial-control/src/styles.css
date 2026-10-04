@@ -36,7 +36,24 @@
 }
 
 body {
-  @apply bg-[#dbeafe] text-black overflow-hidden font-sans;
+  @apply bg-[#dbeafe] text-black font-sans;
+  overflow-x: hidden;
+}
+
+@media (min-width: 768px) {
+  body {
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 767px) {
+  button, a {
+    min-height: 44px;
+  }
+
+  .custom-scrollbar {
+    scrollbar-width: thin;
+  }
 }
 
 button, a {
