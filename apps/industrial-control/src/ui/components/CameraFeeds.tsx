@@ -85,8 +85,8 @@ export function CameraFeeds({ telemetry }: { telemetry?: any }) {
                 <span className="text-[10px] font-mono bg-slate-900/60 shadow-sm px-1.5 py-0.5 rounded text-white/90">LIVE • REC</span>
                 <div className="flex flex-col items-end">
                   <span className="text-[10px] font-mono text-amber-500">120fps</span>
-                  <span className={`text-[12px] font-mono font-bold mt-1 px-1.5 py-0.5 rounded ${telemetry?.temperature > 800 ? 'bg-rose-600 text-white animate-pulse shadow-md' : 'bg-rose-500 text-white shadow-sm'} flex items-center gap-1`}>
-                    <Thermometer size={10} /> MAX {Math.round(telemetry?.temperature || 0)}°C
+                  <span className={`text-[12px] font-mono font-bold mt-1 px-1.5 py-0.5 rounded ${(telemetry?.temperature ?? 0) > 800 ? 'bg-rose-600 text-white animate-pulse shadow-md' : 'bg-rose-500 text-white shadow-sm'} flex items-center gap-1`}>
+                    <Thermometer size={10} /> {telemetry?.temperature != null ? `MAX ${Math.round(telemetry.temperature)}°C` : '--°C'}
                   </span>
                 </div>
               </div>

@@ -8,11 +8,29 @@ import nodemailer from "nodemailer";
 import { networkInterfaces } from "os";
 import { exec } from "child_process";
 import { Jimp } from "jimp";
+import { GoogleGenAI, Type } from "@google/genai";
 import { supabaseAdmin } from "./supabase";
 
 dotenv.config();
 
 const router = Router();
+
+function getGeminiClient(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_API_KEY no está configurada en el servidor (Settings > Secrets).",
+    );
+  }
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        "User-Agent": "aistudio-build",
+      },
+    },
+  });
+}
 
 // Helper para registrar/actualizar usuarios en Supabase
 async function syncUserToDb(user: {
@@ -242,25 +260,24 @@ router.post("/chat", async (req, res) => {
       const canFallback = CHAT_FALLBACK_ENABLED && canUseGeminiFallback("chat");
       if (geminiKey && canFallback) {
         try {
-          const modelName = process.env.GEMINI_MODEL || "text-bison-001";
-          const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generate?key=${geminiKey}`;
-          const payload = {
-            prompt: {
-              text: `System: You are Jarvis. Return ONLY JSON. Context: ${JSON.stringify(currentScene)}. User: ${prompt}`,
+          const ai = getGeminiClient();
+          const modelName = process.env.GEMINI_MODEL || "gemini-4-hydrogen";
+          const response = await ai.models.generateContent({
+            model: modelName,
+            contents: `Context: ${JSON.stringify(currentScene)}. User: ${prompt}`,
+            config: {
+              systemInstruction:
+                "You are Jarvis, an industrial control agent. Return ONLY valid JSON with keys: message, gcode (array of strings), safetyStatus.",
+              responseMimeType: "application/json",
             },
-            temperature: 0.2,
-            maxOutputTokens: 512,
-          };
-
-          const gemRes = await axios.post(url, payload, {
-            timeout: GEMINI_TIMEOUT_MS,
           });
 
-          const textOutput =
-            (gemRes.data?.candidates && gemRes.data.candidates[0]?.content) ||
-            gemRes.data?.output ||
-            gemRes.data;
-          result = { message: textOutput };
+          const textOutput = response.text || "{}";
+          try {
+            result = JSON.parse(textOutput);
+          } catch {
+            result = { message: textOutput };
+          }
           await logFallbackEvent("chat", true, "gemini_success", {
             model: modelName,
           });
@@ -365,35 +382,30 @@ router.post("/vision", async (req, res) => {
       canFallback
     ) {
       try {
-        const modelName = process.env.GEMINI_MODEL || "text-bison-001";
-        const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generate?key=${geminiKey}`;
-        const prompt = `You are a vision assistant. Return only JSON. Analyze the image data and provided edge metadata, then return detections, recommendation, and notes. Image metadata: ${JSON.stringify(edgeAnalysis.metadata)}.`;
-        const payload = {
-          prompt: { text: prompt },
-          temperature: 0.1,
-          maxOutputTokens: 512,
-        };
+        const ai = getGeminiClient();
+        const modelName = process.env.GEMINI_MODEL || "gemini-4-hydrogen";
+        const prompt = `Analyze the provided edge metadata, then return detections, recommendation, and notes. Image metadata: ${JSON.stringify(edgeAnalysis.metadata)}.`;
 
-        const gemRes = await axios.post(url, payload, {
-          timeout: VISION_GEMINI_TIMEOUT_MS,
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            systemInstruction:
+              "You are an industrial computer vision assistant. Return only JSON with detections, recommendation, and notes.",
+            responseMimeType: "application/json",
+          },
         });
-        const textOutput =
-          (gemRes.data?.candidates && gemRes.data.candidates[0]?.content) ||
-          gemRes.data?.output ||
-          gemRes.data;
+        const textOutput = response.text || "{}";
 
         try {
-          const parsed =
-            typeof textOutput === "string"
-              ? JSON.parse(textOutput)
-              : textOutput;
+          const parsed = JSON.parse(textOutput);
           if (parsed?.detections)
             responsePayload.detections = parsed.detections;
           if (parsed?.recommendation)
             responsePayload.recommendation = parsed.recommendation;
           responsePayload.gemini = parsed;
           responsePayload.source = "local_edge+gemini";
-        } catch (parseErr) {
+        } catch {
           responsePayload.gemini = { raw: textOutput };
         }
         responsePayload.fallback = "gemini";
@@ -413,6 +425,177 @@ router.post("/vision", async (req, res) => {
     return res.json(responsePayload);
   } catch (err: any) {
     console.error("Vision stub error:", err);
+    return res.status(500).json({ error: String(err?.message || err) });
+  }
+});
+
+router.get("/check-env", (_req, res) => {
+  res.json({
+    configured: Boolean(
+      process.env.GEMINI_API_KEY ||
+        process.env.VITE_OLLAMA_MODEL ||
+        process.env.SUPABASE_URL,
+    ),
+    geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+  });
+});
+
+// Gemini-powered hardware, obstacle avoidance & firmware synthesis endpoint
+router.post("/hardware/gemini-control", async (req, res) => {
+  try {
+    const {
+      prompt,
+      boardId,
+      boardLabel,
+      language,
+      obstacleTelemetry,
+      safetyThresholdCm,
+      currentCode,
+    } = req.body || {};
+
+    if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
+      return res.status(400).json({
+        error: "Se requiere una instrucción para el controlador Gemini.",
+      });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(503).json({
+        error:
+          "GEMINI_API_KEY no está configurada en Settings > Secrets del servidor.",
+      });
+    }
+
+    const ai = getGeminiClient();
+    const systemInstruction = `You are an embedded robotics and industrial automation engineer controlling Arduino (C++ / .ino) and Raspberry Pi / Pico (MicroPython / Python) boards over browser Web Serial.
+Evaluate obstacle sensor telemetry carefully:
+- If obstacleDetected is true or distanceCm <= safetyThresholdCm, prioritize human and machine safety by emitting an immediate stop / safe avoidance command (e.g. "M112" or "STOP" or "AVOID_LEFT") before motion commands.
+- Return serialCommands as short ASCII serial lines compatible with USB Serial telemetry/control firmware.
+- Only generate generatedCode when the user asks to write, modify, fix, or generate firmware/code, otherwise return an empty string "".
+Respond concisely in Spanish for "reply".`;
+
+    const contextPayload = {
+      boardId: boardId || "arduino_uno",
+      boardLabel: boardLabel || "Arduino Uno",
+      language: language || "arduino",
+      safetyThresholdCm: safetyThresholdCm ?? 25,
+      obstacleTelemetry: obstacleTelemetry ?? null,
+      hasEditorCode: Boolean(currentCode),
+      editorCodePreview:
+        typeof currentCode === "string" ? currentCode.slice(0, 1800) : "",
+    };
+
+    const response = await ai.models.generateContent({
+      model: "gemini-4-hydrogen",
+      contents: `Hardware context:\n${JSON.stringify(contextPayload, null, 2)}\n\nOperator instruction:\n${prompt.trim()}`,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            reply: {
+              type: Type.STRING,
+              description: "Concise Spanish explanation of action or diagnosis.",
+            },
+            safetyAction: {
+              type: Type.STRING,
+              description: "One of: PROCEED, CAUTION, AVOID_MANEUVER, EMERGENCY_STOP",
+            },
+            serialCommands: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Ordered list of ASCII commands to send over USB Serial.",
+            },
+            generatedCode: {
+              type: Type.STRING,
+              description: "Complete Arduino .ino or Raspberry Pi .py source code if requested, else empty string.",
+            },
+            recommendedFilename: {
+              type: Type.STRING,
+              description: "Filename like obstacle_guard.ino or main.py if generatedCode is non-empty.",
+            },
+          },
+          required: ["reply", "safetyAction", "serialCommands", "generatedCode"],
+        },
+      },
+    });
+
+    const parsed = JSON.parse(response.text || "{}");
+    return res.json({
+      ok: true,
+      reply: parsed.reply || "Análisis completado.",
+      safetyAction: parsed.safetyAction || "PROCEED",
+      serialCommands: Array.isArray(parsed.serialCommands)
+        ? parsed.serialCommands
+        : [],
+      generatedCode:
+        typeof parsed.generatedCode === "string" ? parsed.generatedCode : "",
+      recommendedFilename:
+        typeof parsed.recommendedFilename === "string"
+          ? parsed.recommendedFilename
+          : undefined,
+    });
+  } catch (err: any) {
+    console.error("Gemini hardware control error:", err);
+    const status = err?.status || err?.statusCode || 500;
+    return res.status(status >= 400 && status < 600 ? status : 500).json({
+      error:
+        err?.message ||
+        "Error consultando Gemini API para control de hardware.",
+    });
+  }
+});
+
+router.post("/analyze-vision", async (req, res) => {
+  try {
+    const { image } = req.body || {};
+    if (!image) {
+      return res.status(400).json({ error: "image required" });
+    }
+
+    const visionKey = process.env.GOOGLE_CLOUD_VISION_API_KEY;
+    if (visionKey) {
+      try {
+        const content = String(image).replace(/^data:image\/\w+;base64,/, "");
+        const visionRes = await axios.post(
+          `https://vision.googleapis.com/v1/images:annotate?key=${visionKey}`,
+          {
+            requests: [
+              {
+                image: { content },
+                features: [
+                  { type: "LABEL_DETECTION", maxResults: 6 },
+                  { type: "OBJECT_LOCALIZATION", maxResults: 6 },
+                ],
+              },
+            ],
+          },
+          { timeout: VISION_GEMINI_TIMEOUT_MS },
+        );
+        return res.json(visionRes.data);
+      } catch (err) {
+        console.warn("Google Cloud Vision fallback to edge analysis:", err);
+      }
+    }
+
+    const edge = await analyzeImageEdge(String(image));
+    return res.json({
+      responses: [
+        {
+          labelAnnotations: edge.detections.map((d) => ({
+            description: d.label,
+            score: d.confidence,
+          })),
+          localizedObjectAnnotations: edge.detections.map((d) => ({
+            name: d.label,
+            score: d.confidence,
+          })),
+        },
+      ],
+    });
+  } catch (err: any) {
+    console.error("Analyze vision error:", err);
     return res.status(500).json({ error: String(err?.message || err) });
   }
 });

@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { hardware } from '../../services/hardwareController';
 import { Play, Square, AlertOctagon, Terminal, Cpu, Settings2, Power, Droplets, Wind, Blocks, Bot, Search, PlusCircle, Download } from 'lucide-react';
 import { ArduinoFirmwareDialog } from './ArduinoFirmwareDialog';
+import { useTelemetry } from '../../store/telemetryStore';
 
 export function HardwareControl() {
+  const { activePosition, currentTelemetry } = useTelemetry();
   const [activeTab, setActiveTab] = useState<'hmi' | 'lego'>('hmi');
   const [connected, setConnected] = useState(false);
   const [gcode, setGcode] = useState('');
@@ -154,83 +156,94 @@ export function HardwareControl() {
 
   return (
     <div className="glass-panel p-5 flex flex-col h-full shrink-0 border border-white/5 bg-black/40">
-       <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-3">
-         <div className="flex gap-4">
-           <button 
-             onClick={() => setActiveTab('hmi')}
-             className={`text-sm font-medium font-mono tracking-widest flex items-center gap-2 transition-all ${activeTab === 'hmi' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
-           >
-             <Cpu size={16} className={activeTab === 'hmi' ? 'text-blue-500' : ''} /> PLC HARDWARE LINK
-           </button>
-           <button 
-             onClick={() => setActiveTab('lego')}
-             className={`text-sm font-medium flex items-center gap-2 transition-all ${activeTab === 'lego' ? 'text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
-           >
-             <Blocks size={16} className={activeTab === 'lego' ? 'text-indigo-500' : ''} /> LEGO AUTOMATION (ULTRON)
-           </button>
-         </div>
-         
-         {activeTab === 'hmi' && (
-          <div className="flex flex-col gap-2 relative z-10">
-            <div className="flex items-center justify-end gap-2">
-              {connectionError && (
-                <div className="text-[10px] text-rose-500 font-mono flex items-center gap-1 bg-rose-500/10 px-2 py-1 rounded border border-rose-500/20 shadow-sm animate-pulse">
-                  <AlertOctagon size={10} /> {connectionError}
-                </div>
-              )}
-              {connectionStatus === 'connecting' && (
-                <div className="text-[10px] text-google-blue font-mono flex items-center gap-1 bg-google-blue/10 px-2 py-1 rounded border border-google-blue/20 shadow-sm">
-                  <Power size={10} className="animate-spin" /> CONNECTING...
-                </div>
-              )}
-              <button 
-                onClick={() => setShowFirmwareDialog(true)}
-                className="bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] px-2 py-1 rounded text-slate-300 font-mono flex items-center gap-1 shadow-sm transition-all"
-              >
-                <Download size={10} /> FIRMWARE SETUP
-              </button>
-              {connected ? (
-                <button onClick={handleDisconnect} className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-xs px-2 py-1 rounded text-rose-500 font-mono flex items-center gap-1 shadow-sm">
+      <div className="flex flex-col gap-3 mb-4 border-b border-white/10 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => setActiveTab('hmi')}
+              className={`text-xs font-medium font-mono tracking-wider flex items-center gap-1.5 transition-all ${activeTab === 'hmi' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+              <Cpu size={14} className={activeTab === 'hmi' ? 'text-blue-500' : ''} /> PLC HARDWARE LINK
+            </button>
+            <button
+              onClick={() => setActiveTab('lego')}
+              className={`text-xs font-medium font-mono tracking-wider flex items-center gap-1.5 transition-all ${activeTab === 'lego' ? 'text-white' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <Blocks size={14} className={activeTab === 'lego' ? 'text-indigo-500' : ''} /> LEGO AUTOMATION (ULTRON)
+            </button>
+          </div>
+
+          {activeTab === 'hmi' && (
+            <button
+              onClick={() => setShowFirmwareDialog(true)}
+              className="bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] px-2 py-1 rounded text-slate-300 font-mono flex items-center gap-1 shadow-sm transition-all shrink-0"
+            >
+              <Download size={10} /> FIRMWARE SETUP
+            </button>
+          )}
+        </div>
+
+        {activeTab === 'hmi' && (
+          <div className="flex flex-col gap-2 relative z-10 w-full">
+            {(connectionError || connectionStatus === 'connecting') && (
+              <div className="flex flex-wrap items-center gap-2">
+                {connectionError && (
+                  <div className="text-[10px] text-rose-500 font-mono flex items-center gap-1 bg-rose-500/10 px-2 py-1 rounded border border-rose-500/20 shadow-sm">
+                    <AlertOctagon size={10} /> {connectionError}
+                  </div>
+                )}
+                {connectionStatus === 'connecting' && (
+                  <div className="text-[10px] text-google-blue font-mono flex items-center gap-1 bg-google-blue/10 px-2 py-1 rounded border border-google-blue/20 shadow-sm">
+                    <Power size={10} className="animate-spin" /> CONNECTING...
+                  </div>
+                )}
+              </div>
+            )}
+
+            {connected ? (
+              <div className="flex justify-end">
+                <button
+                  onClick={handleDisconnect}
+                  className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-xs px-2.5 py-1 rounded text-rose-500 font-mono flex items-center gap-1 shadow-sm"
+                >
                   <Square size={10} /> DISCONNECT
                 </button>
-              ) : (
-                <div className="flex items-center gap-1 bg-black/40 border border-white/10 rounded p-1 shadow-inner">
-                  <input 
-                    type="text" 
-                    value={streamUrl} 
-                    onChange={e => {
-                       setStreamUrl(e.target.value);
-                       setConnectionError(null);
-                    }} 
-                    placeholder="wss:// / mqtt://" 
-                    className={`text-[10px] p-1 font-mono outline-none bg-transparent text-slate-300 placeholder:text-slate-600 ${streamUrl.includes('mqtt') ? 'w-24' : 'w-36'}`}
-                    title="Stream URL (ws:// or mqtt://)"
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-1.5 bg-black/40 border border-white/10 rounded p-1.5 shadow-inner w-full">
+                <input
+                  type="text"
+                  value={streamUrl}
+                  onChange={e => {
+                    setStreamUrl(e.target.value);
+                    setConnectionError(null);
+                  }}
+                  placeholder="wss:// / mqtt://"
+                  className="flex-1 min-w-[120px] text-[10px] p-1 font-mono outline-none bg-transparent text-slate-300 placeholder:text-slate-600"
+                  title="Stream URL (ws:// or mqtt://)"
+                  disabled={connectionStatus === 'connecting'}
+                />
+                {streamUrl.includes('mqtt') && (
+                  <input
+                    type="text"
+                    value={streamTopic}
+                    onChange={e => setStreamTopic(e.target.value)}
+                    placeholder="topic"
+                    className="w-20 text-[10px] p-1 font-mono outline-none bg-black/40 border border-white/10 rounded text-slate-300 placeholder:text-slate-600"
+                    title="MQTT Topic"
                     disabled={connectionStatus === 'connecting'}
                   />
-                  {streamUrl.includes('mqtt') && (
-                    <>
-                      <div className="w-px h-3 bg-white/10 mx-0.5"></div>
-                      <input 
-                        type="text" 
-                        value={streamTopic} 
-                        onChange={e => setStreamTopic(e.target.value)} 
-                        placeholder="topic" 
-                        className="w-16 text-[10px] p-1 font-mono outline-none bg-transparent text-slate-300 placeholder:text-slate-600"
-                        title="MQTT Topic"
-                        disabled={connectionStatus === 'connecting'}
-                      />
-                    </>
-                  )}
-                  <button 
-                    onClick={handleConnectStream} 
+                )}
+                <div className="flex items-center gap-1 ml-auto shrink-0">
+                  <button
+                    onClick={handleConnectStream}
                     disabled={connectionStatus === 'connecting' || !streamUrl}
                     className="bg-google-blue hover:bg-blue-600 disabled:bg-slate-700 text-white text-[10px] px-2 py-1 rounded font-mono shadow-sm transition-all flex items-center gap-1"
                   >
                     <Power size={10} /> STREAM
                   </button>
-                  <div className="w-px h-4 bg-white/20 mx-1"></div>
-                  <button 
-                    onClick={handleConnect} 
+                  <button
+                    onClick={handleConnect}
                     disabled={connectionStatus === 'connecting'}
                     className="bg-emerald-600 border border-emerald-500/50 hover:bg-emerald-500 disabled:bg-slate-700 text-white text-[10px] px-2 py-1 rounded font-mono shadow-sm transition-all flex items-center gap-1"
                     title="Connect via Web Serial API (USB)"
@@ -238,10 +251,10 @@ export function HardwareControl() {
                     <Play size={10} /> SERIAL
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-         )}
+        )}
       </div>
 
       <ArduinoFirmwareDialog isOpen={showFirmwareDialog} onClose={() => setShowFirmwareDialog(false)} />
@@ -381,40 +394,46 @@ export function HardwareControl() {
                     <td className="py-1.5 px-2 text-google-green">OK</td>
                   </tr>
                   <tr className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="py-1.5 px-2 text-google-blue">CONV_MTR_SPD</td>
-                    <td className="py-1.5 px-2 text-white">{conveyor ? '1500' : '0'}</td>
-                    <td className="py-1.5 px-2 text-slate-500">{lastUpdate !== '--:--:--' ? lastUpdate : new Date().toISOString().split('T')[1].slice(0,8)}</td>
+                    <td className="py-1.5 px-2 text-google-blue">CONV_MTR_ST</td>
+                    <td className="py-1.5 px-2 text-white">{conveyor ? 'ACTIVE' : 'OFF'}</td>
+                    <td className="py-1.5 px-2 text-slate-500">{lastUpdate}</td>
                     <td className="py-1.5 px-2">{conveyor ? <span className="text-orange-400 font-bold">RUNNING</span> : <span className="text-slate-600">IDLE</span>}</td>
                   </tr>
                   <tr className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-1.5 px-2 text-google-blue">TEMP_SENSOR</td>
                     <td className="py-1.5 px-2 font-bold text-white">{sensorData.temp !== null ? `${sensorData.temp.toFixed(1)} °C` : '---'}</td>
                     <td className="py-1.5 px-2 text-slate-500">{lastUpdate}</td>
-                    <td className="py-1.5 px-2">{sensorData.temp !== null && sensorData.temp > 800 ? <span className="text-rose-500 font-bold">WARN</span> : <span className="text-google-green">OK</span>}</td>
+                    <td className="py-1.5 px-2">{sensorData.temp !== null && sensorData.temp > 800 ? <span className="text-rose-500 font-bold">WARN</span> : <span className="text-google-green">{sensorData.temp !== null ? 'OK' : 'WAIT'}</span>}</td>
                   </tr>
                   <tr className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-1.5 px-2 text-google-blue">VIB_SENSOR</td>
                     <td className="py-1.5 px-2 font-bold text-white">{sensorData.vib !== null ? `${sensorData.vib.toFixed(2)} mm/s` : '---'}</td>
                     <td className="py-1.5 px-2 text-slate-500">{lastUpdate}</td>
-                    <td className="py-1.5 px-2">{sensorData.vib !== null && sensorData.vib > 5 ? <span className="text-rose-500 font-bold">WARN</span> : <span className="text-google-green">OK</span>}</td>
+                    <td className="py-1.5 px-2">{sensorData.vib !== null && sensorData.vib > 5 ? <span className="text-rose-500 font-bold">WARN</span> : <span className="text-google-green">{sensorData.vib !== null ? 'OK' : 'WAIT'}</span>}</td>
                   </tr>
                   <tr className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-1.5 px-2 text-google-blue">LOAD_SENSOR</td>
                     <td className="py-1.5 px-2 font-bold text-white">{sensorData.load !== null ? `${sensorData.load.toFixed(1)} %` : '---'}</td>
                     <td className="py-1.5 px-2 text-slate-500">{lastUpdate}</td>
-                    <td className="py-1.5 px-2">{sensorData.load !== null && sensorData.load > 85 ? <span className="text-rose-500 font-bold">WARN</span> : <span className="text-google-green">OK</span>}</td>
+                    <td className="py-1.5 px-2">{sensorData.load !== null && sensorData.load > 85 ? <span className="text-rose-500 font-bold">WARN</span> : <span className="text-google-green">{sensorData.load !== null ? 'OK' : 'WAIT'}</span>}</td>
+                  </tr>
+                  <tr className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="py-1.5 px-2 text-google-blue">OBSTACLE_DIST</td>
+                    <td className="py-1.5 px-2 font-bold text-white">{currentTelemetry.distanceCm !== null ? `${currentTelemetry.distanceCm.toFixed(1)} cm` : '---'}</td>
+                    <td className="py-1.5 px-2 text-slate-500">{lastUpdate}</td>
+                    <td className="py-1.5 px-2">{currentTelemetry.obstacleDetected ? <span className="text-rose-500 font-bold">BLOCKED</span> : <span className="text-slate-500">{currentTelemetry.distanceCm !== null ? 'CLEAR' : 'WAIT'}</span>}</td>
                   </tr>
                   <tr className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-1.5 px-2 text-google-blue">AXIS_X_POS</td>
-                    <td className="py-1.5 px-2 text-white">145.23</td>
-                    <td className="py-1.5 px-2 text-slate-500">{lastUpdate !== '--:--:--' ? lastUpdate : new Date().toISOString().split('T')[1].slice(0,8)}</td>
-                    <td className="py-1.5 px-2 text-google-green">OK</td>
+                    <td className="py-1.5 px-2 text-white">{activePosition ? activePosition.x.toFixed(2) : '---'}</td>
+                    <td className="py-1.5 px-2 text-slate-500">{lastUpdate}</td>
+                    <td className="py-1.5 px-2 text-google-green">{activePosition ? 'OK' : 'WAIT'}</td>
                   </tr>
                   <tr className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-1.5 px-2 text-google-blue">AXIS_Y_POS</td>
-                    <td className="py-1.5 px-2 text-white">-22.10</td>
-                    <td className="py-1.5 px-2 text-slate-500">{lastUpdate !== '--:--:--' ? lastUpdate : new Date().toISOString().split('T')[1].slice(0,8)}</td>
-                    <td className="py-1.5 px-2 text-google-green">OK</td>
+                    <td className="py-1.5 px-2 text-white">{activePosition ? activePosition.y.toFixed(2) : '---'}</td>
+                    <td className="py-1.5 px-2 text-slate-500">{lastUpdate}</td>
+                    <td className="py-1.5 px-2 text-google-green">{activePosition ? 'OK' : 'WAIT'}</td>
                   </tr>
                   <tr className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-1.5 px-2 text-google-blue">ESTOP_RELAY</td>

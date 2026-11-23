@@ -11,30 +11,43 @@ export function JarvisAR() {
   const [calibrationPhase, setCalibrationPhase] = useState<'initial' | 'scanning' | 'anchoring' | 'complete'>('initial');
   const [scanProgress, setScanProgress] = useState(0);
 
-  useEffect(() => {
-    // 1. Obtener múltiples cámaras físicas (AR/C4 Mode)
-    navigator.mediaDevices.enumerateDevices().then(deviceInfos => {
-      const videoDevices = deviceInfos.filter(d => d.kind === 'videoinput');
-      // Devices no longer set to state
-      
-      // Pedir streams para todas las cámaras disponibles (hasta 4)
-      const feedPromises = videoDevices.slice(0, 4).map(device => 
-        navigator.mediaDevices.getUserMedia({
-          video: { deviceId: device.deviceId, width: { ideal: 1280 }, facingMode: 'environment' }
-        }).catch(err => {
-          console.warn("Error con cámara", device.label, err);
-          return null;
-        })
-      );
+  const streamsRef = useRef<MediaStream[]>([]);
 
-      Promise.all(feedPromises).then(streams => {
-        setActiveFeeds(streams.filter(Boolean) as MediaStream[]);
-        setCalibrationPhase('scanning'); // Auto-start calibration when feeds are ready
-      });
-    });
+  useEffect(() => {
+    let active = true;
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    navigator.mediaDevices
+      .enumerateDevices()
+      .then((deviceInfos) => {
+        const videoDevices = deviceInfos.filter((d) => d.kind === "videoinput");
+        const targets = videoDevices.length > 0 ? videoDevices.slice(0, 4) : [null];
+        const feedPromises = targets.map((device) =>
+          navigator.mediaDevices
+            .getUserMedia({
+              video: device
+                ? { deviceId: device.deviceId, width: { ideal: 1280 }, facingMode: "environment" }
+                : { width: { ideal: 1280 }, facingMode: "environment" },
+            })
+            .catch(() => null),
+        );
+
+        Promise.all(feedPromises).then((streams) => {
+          const valid = streams.filter(Boolean) as MediaStream[];
+          if (!active) {
+            valid.forEach((s) => s.getTracks().forEach((t) => t.stop()));
+            return;
+          }
+          streamsRef.current = valid;
+          setActiveFeeds(valid);
+          setCalibrationPhase("scanning");
+        });
+      })
+      .catch(() => {});
 
     return () => {
-      activeFeeds.forEach(s => s.getTracks().forEach(t => t.stop()));
+      active = false;
+      streamsRef.current.forEach((s) => s.getTracks().forEach((t) => t.stop()));
+      streamsRef.current = [];
     };
   }, []);
 
@@ -178,7 +191,7 @@ export function JarvisAR() {
 
       {/* AR Calibration Overlay */}
       {calibrationPhase !== 'complete' && activeFeeds.length > 0 && (
-        <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center">
+        <div className="absolute inset-0 z-40 bg-slate-950/75 flex flex-col items-center justify-center">
           <div className="max-w-md w-full bg-slate-900/90 border border-slate-700 p-8 rounded-2xl shadow-2xl text-center">
             
             {calibrationPhase === 'scanning' && (
@@ -220,13 +233,13 @@ export function JarvisAR() {
       <canvas ref={canvasRef} className={`absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-1000 ${calibrationPhase === 'complete' ? 'opacity-100' : 'opacity-0'}`} />
 
       {/* Botones Flotantes Reales */}
-      <div className={`absolute bottom-4 left-4 flex gap-2 transition-opacity duration-500 ${calibrationPhase === 'complete' ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="bg-slate-900/80 text-slate-300 font-mono text-xs px-3 py-1 rounded border border-slate-700 backdrop-blur">
-          <Target className="inline w-3 h-3 mr-1"/>
-          MODO: GOD'S EYE (C4)
+      <div className={`absolute bottom-12 left-3 flex gap-2 transition-opacity duration-500 ${calibrationPhase === 'complete' ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="bg-slate-950/90 text-slate-300 font-mono text-[10px] px-2.5 py-1 rounded border border-slate-700">
+          <Target className="inline w-3 h-3 mr-1 text-blue-400"/>
+          MODO: GOD&apos;S EYE (C4)
         </div>
-        <div className="bg-slate-900/80 text-slate-300 font-mono text-xs px-3 py-1 rounded border border-slate-700 backdrop-blur flex items-center">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
+        <div className="bg-slate-950/90 text-slate-300 font-mono text-[10px] px-2.5 py-1 rounded border border-slate-700 flex items-center">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>
           SPATIAL ANCHOR: LOCKED
         </div>
       </div>

@@ -1,4 +1,5 @@
-import { Sphere, Html, Float, Sparkles } from "@react-three/drei";
+import { Sphere, Float, Sparkles } from "@react-three/drei";
+import { SafeHtml as Html } from "./SafeHtml";
 import { SpatialSuggestion } from "../../services/spatialAnalysisService"; // Verifica que esta sea la ruta real ahora
 import { Zap, Activity, Info } from "lucide-react";
 

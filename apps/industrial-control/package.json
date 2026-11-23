@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "tsx server.ts",
     "dev:server": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
+    "lint": "eslint . --max-warnings 0",
     "format": "prettier --write \"{src,tests,docs}/**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
@@ -16,8 +16,7 @@
     "release": "standard-version",
     "setup:ollama": "powershell -NoProfile -ExecutionPolicy Bypass -File setup-ollama.ps1",
     "setup:ollama:mac": "bash setup-ollama.sh",
-    "start": "concurrently \"npm run dev\" \"npm run dev:server\"",
-    "start:local": "npm run start & ollama serve"
+    "start": "NODE_ENV=production tsx server.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1079.0",

@@ -9,13 +9,25 @@ interface OllamaStatus {
 }
 
 export function OllamaSetupGuide() {
+  const isLocalhost =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1");
+
+  const [dismissed, setDismissed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    if (window.location.search.includes("autostart=1")) return true;
+    return !isLocalhost || sessionStorage.getItem("ollama_guide_dismissed") === "true";
+  });
+
   const [status, setStatus] = useState<OllamaStatus>({
     running: false,
     modelsAvailable: [],
-    loading: true,
+    loading: !dismissed,
   });
 
   useEffect(() => {
+    if (dismissed) return;
     const checkOllamaStatus = async () => {
       try {
         // Check if Ollama is running
@@ -41,14 +53,29 @@ export function OllamaSetupGuide() {
     checkOllamaStatus();
     const interval = setInterval(checkOllamaStatus, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [dismissed]);
+
+  if (dismissed) {
+    return null;
+  }
+
+  const handleDismiss = () => {
+    sessionStorage.setItem("ollama_guide_dismissed", "true");
+    setDismissed(true);
+  };
 
   if (status.loading) {
     return (
-      <motion.div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <motion.div className="fixed inset-0 z-50 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
           <Loader className="w-12 h-12 text-purple-400 animate-spin mx-auto mb-4" />
           <p className="text-white text-lg">Verificando Ollama...</p>
+          <button
+            onClick={handleDismiss}
+            className="mt-4 text-xs text-gray-300 underline hover:text-white"
+          >
+            Continuar sin Ollama
+          </button>
         </div>
       </motion.div>
     );
@@ -57,7 +84,7 @@ export function OllamaSetupGuide() {
   if (!status.running) {
     return (
       <motion.div
-        className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
@@ -125,6 +152,13 @@ export function OllamaSetupGuide() {
             Recargar cuando esté listo
           </button>
 
+          <button
+            onClick={handleDismiss}
+            className="w-full mt-2 bg-slate-700 hover:bg-slate-600 text-gray-200 font-medium py-2 rounded transition text-sm"
+          >
+            Continuar sin Ollama
+          </button>
+
           <p className="text-xs text-gray-500 text-center mt-4">
             Tiempo estimado: 2-5 minutos
           </p>
@@ -172,6 +206,13 @@ export function OllamaSetupGuide() {
             className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 rounded transition"
           >
             Verificar cuando esté listo
+          </button>
+
+          <button
+            onClick={handleDismiss}
+            className="w-full mt-2 bg-slate-700 hover:bg-slate-600 text-gray-200 font-medium py-2 rounded transition text-sm"
+          >
+            Continuar sin Ollama
           </button>
         </motion.div>
       </motion.div>

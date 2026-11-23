@@ -1,6 +1,18 @@
-import { useState, useRef, useEffect } from "react";
-import { Send, ChevronRight, Zap, X } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
+import { useState } from "react";
+import {
+  Cpu,
+  Check,
+  ChevronRight,
+  X,
+  Boxes,
+  Thermometer,
+  Activity,
+  Gauge,
+  Camera,
+  Sliders,
+  Sparkles,
+} from "lucide-react";
+import { assemblyStore } from "../../store/assemblyStore";
 
 export interface MachineProfile {
   machineType: "cnc" | "plasma" | "laser" | "other" | null;
@@ -8,15 +20,9 @@ export interface MachineProfile {
   sensors: string[];
   description: string;
   hasArduino: boolean;
+  preset?: "cnc_gantry" | "arm_3dof" | "rotary_station";
+  aiMode?: "gemini" | "ollama" | "hybrid";
   completed: boolean;
-}
-
-interface ChatMessage {
-  id: string;
-  role: "gopilot" | "user";
-  content: string;
-  options?: string[];
-  action?: string;
 }
 
 interface OnboardingChatProps {
@@ -24,398 +30,327 @@ interface OnboardingChatProps {
   onSkip: () => void;
 }
 
-const MACHINE_TYPES = {
-  cnc: {
-    label: "CNC/Fresadora",
-    emoji: "⚙️",
-    sensors: ["thermal", "vibration", "load", "spindle-rpm"],
+const MACHINE_PRESETS: Array<{
+  type: "cnc" | "plasma" | "laser" | "other";
+  preset: "cnc_gantry" | "arm_3dof" | "rotary_station";
+  label: string;
+  subtitle: string;
+  defaultSensors: string[];
+}> = [
+  {
+    type: "cnc",
+    preset: "cnc_gantry",
+    label: "Pórtico CNC / Fresadora",
+    subtitle: "Ejes lineales X/Y/Z + cabezal helicoidal",
+    defaultSensors: ["thermal", "vibration", "load"],
   },
-  plasma: {
-    label: "Cortadora de Plasma",
-    emoji: "⚡",
-    sensors: ["thermal", "pressure", "arc-voltage", "flow-rate"],
+  {
+    type: "other",
+    preset: "arm_3dof",
+    label: "Brazo Robótico 3-DOF",
+    subtitle: "Articulaciones rotatorias + servo muñeca",
+    defaultSensors: ["load", "vibration", "thermal"],
   },
-  laser: {
-    label: "Cortadora Láser",
-    emoji: "🔴",
-    sensors: ["thermal", "power-output", "cooling-temp", "air-assist"],
+  {
+    type: "plasma",
+    preset: "rotary_station",
+    label: "Estación Rotatoria / Plasma",
+    subtitle: "Mesa indexada 360° + actuador lineal",
+    defaultSensors: ["thermal", "pressure", "flow"],
   },
-  other: { label: "Otra máquina", emoji: "🔧", sensors: [] },
-};
+  {
+    type: "laser",
+    preset: "cnc_gantry",
+    label: "Cortadora Láser / Prototipo XR",
+    subtitle: "Control de ejes con cámara sin fondo",
+    defaultSensors: ["thermal", "camera"],
+  },
+];
 
-const SENSOR_RECOMMENDATIONS = {
-  thermal: {
-    name: "Sensor Térmico",
-    icon: "🌡️",
-    description: "Monitorea temperatura en tiempo real",
-  },
-  vibration: {
-    name: "Acelerómetro",
-    icon: "📊",
-    description: "Detecta vibraciones anormales",
-  },
-  load: {
-    name: "Sensor de Carga",
-    icon: "⚖️",
-    description: "Mide esfuerzo operacional",
-  },
-  ultrasonic: {
-    name: "Sensor Ultrasónico",
-    icon: "📡",
-    description: "Proximidad y medición de distancia",
-  },
-  camera: {
-    name: "Cámara USB",
-    icon: "📹",
-    description: "Visión por computadora",
-  },
-  pressure: {
-    name: "Sensor de Presión",
-    icon: "💨",
-    description: "Monitoreo de presión",
-  },
-};
+const SENSOR_OPTIONS = [
+  { id: "thermal", label: "Térmico IR", desc: "Temperatura en tiempo real", icon: Thermometer },
+  { id: "vibration", label: "Acelerómetro", desc: "Vibración y desgaste", icon: Activity },
+  { id: "load", label: "Carga / Torque", desc: "Esfuerzo de actuadores", icon: Gauge },
+  { id: "flow", label: "Caudal / Presión", desc: "Refrigerante o gas", icon: Sliders },
+  { id: "camera", label: "Cámara AR / RGB", desc: "Superposición XR sin fondo", icon: Camera },
+];
 
 export function OnboardingChat({ onComplete, onSkip }: OnboardingChatProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "1",
-      role: "gopilot",
-      content:
-        "¡Hola! Soy **GoPilot**, tu asistente inteligente para control industrial. 👋\n\nEstoy aquí para ayudarte a configurar y monitorear tu máquina. Primero, déjame aprender sobre ti.",
-      options: ["Comencemos 🚀", "Saltar este paso"],
-      action: "start",
-    },
-  ]);
+  const [selectedPresetIdx, setSelectedPresetIdx] = useState(0);
+  const [machineName, setMachineName] = useState("Célula Prototipo 01");
+  const [hasArduino, setHasArduino] = useState(true);
+  const [aiMode, setAiMode] = useState<"gemini" | "ollama" | "hybrid">("hybrid");
+  const [sensors, setSensors] = useState<string[]>(["thermal", "vibration", "load", "camera"]);
 
-  const [currentStep, setCurrentStep] = useState<
-    | "greeting"
-    | "machine-type"
-    | "machine-name"
-    | "arduino"
-    | "sensors"
-    | "summary"
-  >("greeting");
-  const [machineProfile, setMachineProfile] = useState<MachineProfile>({
-    machineType: null,
-    machineName: "",
-    sensors: [],
-    description: "",
-    hasArduino: false,
-    completed: false,
-  });
+  const activePreset = MACHINE_PRESETS[selectedPresetIdx];
 
-  const [userInput, setUserInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const toggleSensor = (id: string) => {
+    setSensors((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+    );
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const handleUserResponse = async (response: string) => {
-    if (isLoading) return;
-
-    // Add user message
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: "user",
-      content: response,
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setUserInput("");
-    setIsLoading(true);
-
-    // Simulate thinking delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    let nextMessage: ChatMessage | null = null;
-
-    switch (currentStep) {
-      case "greeting":
-        if (response.includes("Comencemos") || response.includes("🚀")) {
-          setCurrentStep("machine-type");
-          nextMessage = {
-            id: Date.now().toString() + "1",
-            role: "gopilot",
-            content:
-              "¿Qué tipo de máquina tienes? Esto me ayudará a personalizar mis recomendaciones.",
-            options: Object.entries(MACHINE_TYPES).map(
-              ([key, value]) => `${value.emoji} ${value.label}`,
-            ),
-            action: "select-machine",
-          };
-        } else {
-          onSkip();
-          return;
-        }
-        break;
-
-      case "machine-type":
-        const selected = Object.entries(MACHINE_TYPES).find(([_key, value]) =>
-          response.includes(value.label),
-        );
-        if (selected) {
-          const [machineKey] = selected;
-          setMachineProfile((prev) => ({
-            ...prev,
-            machineType: machineKey as any,
-          }));
-          setCurrentStep("machine-name");
-          nextMessage = {
-            id: Date.now().toString() + "1",
-            role: "gopilot",
-            content: `¡Excelente! Detecté que tienes una ${selected[1].label}.\n\n¿Cuál es el **nombre o modelo** de tu máquina? (ej: "Haas VF-4", "Hypertherm Powermax", etc.)`,
-            action: "input-machine-name",
-          };
-        }
-        break;
-
-      case "machine-name":
-        setMachineProfile((prev) => ({ ...prev, machineName: response }));
-        setCurrentStep("arduino");
-        nextMessage = {
-          id: Date.now().toString() + "1",
-          role: "gopilot",
-          content: `Perfecto, ${response}. 📝\n\n¿Tienes **Arduino o microcontrolador** conectado a tu máquina? Esto me ayuda a generar código personalizado.`,
-          options: ["Sí, tengo Arduino ✅", "No, aún no 🚫"],
-          action: "arduino-check",
-        };
-        break;
-
-      case "arduino":
-        const hasArduino = response.includes("Sí");
-        setMachineProfile((prev) => ({ ...prev, hasArduino }));
-        setCurrentStep("sensors");
-        const sensorOptions = machineProfile.machineType
-          ? MACHINE_TYPES[
-              machineProfile.machineType as keyof typeof MACHINE_TYPES
-            ].sensors
-          : [];
-        nextMessage = {
-          id: Date.now().toString() + "1",
-          role: "gopilot",
-          content: `Genial. ${hasArduino ? "Podré generar código específico para tu Arduino. 🤖" : "Te ayudaré a integrar uno después. 🔌"}\n\n¿Qué **sensores** tienes o quieres agregar?`,
-          options: [
-            ...sensorOptions.map(
-              (s) =>
-                `${SENSOR_RECOMMENDATIONS[s as keyof typeof SENSOR_RECOMMENDATIONS]?.icon || "📡"} ${SENSOR_RECOMMENDATIONS[s as keyof typeof SENSOR_RECOMMENDATIONS]?.name || s}`,
-            ),
-            "Ninguno por ahora ⏭️",
-          ],
-          action: "select-sensors",
-        };
-        break;
-
-      case "sensors":
-        const selectedSensors = Object.keys(SENSOR_RECOMMENDATIONS).filter(
-          (key) =>
-            response.includes(
-              SENSOR_RECOMMENDATIONS[key as keyof typeof SENSOR_RECOMMENDATIONS]
-                .name,
-            ),
-        );
-        setMachineProfile((prev) => ({
-          ...prev,
-          sensors: selectedSensors.length > 0 ? selectedSensors : prev.sensors,
-          description: `Máquina: ${machineProfile.machineName}. Sensores: ${selectedSensors.length > 0 ? selectedSensors.join(", ") : "Ninguno"}`,
-        }));
-        setCurrentStep("summary");
-        nextMessage = {
-          id: Date.now().toString() + "1",
-          role: "gopilot",
-          content: `¡Perfecto! Aquí está tu perfil:\n\n**Máquina:** ${machineProfile.machineName}\n**Tipo:** ${machineProfile.machineType && MACHINE_TYPES[machineProfile.machineType].label}\n**Arduino:** ${machineProfile.hasArduino ? "✅ Sí" : "❌ No"}\n**Sensores:** ${selectedSensors.length > 0 ? selectedSensors.join(", ") : "Ninguno"}\n\n¿Empezamos?`,
-          options: ["Sí, comenzar 🚀", "Editar perfil ✏️"],
-          action: "confirm",
-        };
-        break;
-
-      case "summary":
-        if (response.includes("comenzar") || response.includes("🚀")) {
-          const finalProfile: MachineProfile = {
-            ...machineProfile,
-            completed: true,
-          };
-          setMachineProfile(finalProfile);
-          onComplete(finalProfile);
-          return;
-        } else {
-          setCurrentStep("machine-type");
-          nextMessage = {
-            id: Date.now().toString() + "1",
-            role: "gopilot",
-            content: "Claro, volvamos al inicio. ¿Qué tipo de máquina tienes?",
-            options: Object.entries(MACHINE_TYPES).map(
-              ([_k, value]) => `${value.emoji} ${value.label}`,
-            ),
-            action: "select-machine",
-          };
-        }
-        break;
-    }
-
-    if (nextMessage) {
-      setMessages((prev) => [...prev, nextMessage]);
-    }
-    setIsLoading(false);
+  const handleSelectMachine = (idx: number) => {
+    setSelectedPresetIdx(idx);
+    setSensors(MACHINE_PRESETS[idx].defaultSensors);
   };
 
-  const handleOptionClick = (option: string) => {
-    handleUserResponse(option);
+  const handleFinish = () => {
+    assemblyStore.loadPreset(activePreset.preset);
+    onComplete({
+      machineType: activePreset.type,
+      machineName: machineName.trim() || activePreset.label,
+      sensors,
+      description: `${machineName} (${activePreset.label}) — Control: ${hasArduino ? "Arduino/WebSerial" : "Simulación"}`,
+      hasArduino,
+      preset: activePreset.preset,
+      aiMode,
+      completed: true,
+    });
   };
-
-  const progress =
-    [
-      "greeting",
-      "machine-type",
-      "machine-name",
-      "arduino",
-      "sensors",
-      "summary",
-    ].indexOf(currentStep) / 6;
 
   return (
-    <motion.div
-      className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col z-50"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
+    <div className="fixed inset-0 z-50 bg-[#070b12] text-slate-200 flex flex-col overflow-y-auto">
       {/* Header */}
-      <div className="bg-black/40 backdrop-blur-sm border-b border-white/10 px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-slate-800 bg-[#0f1623] px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-            <Zap className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/40 text-blue-400 flex items-center justify-center">
+            <Cpu size={20} />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">GoPilot Setup</h1>
-            <p className="text-xs text-gray-400">Configuración inicial</p>
+            <h1 className="text-base font-bold text-white tracking-tight">
+              BIENVENIDO A 1/0 iAGNT // CONFIGURACIÓN INICIAL
+            </h1>
+            <p className="text-xs font-mono text-slate-400">
+              Prepara tu estructura 3D, ejes automatizados, sensores y controlador antes de entrar al panel
+            </p>
           </div>
         </div>
+
         <button
           onClick={onSkip}
-          title="Cerrar onboarding"
-          className="p-2 hover:bg-white/10 rounded-lg transition text-gray-400 hover:text-white"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:border-slate-500 text-xs font-mono text-slate-300 hover:text-white transition-colors"
         >
-          <X className="w-5 h-5" />
+          <span>Saltar al Panel</span>
+          <X size={14} />
         </button>
-      </div>
+      </header>
 
-      {/* Progress bar */}
-      <div className="h-1 bg-slate-800">
-        <motion.div
-          className="h-full bg-gradient-to-r from-purple-500 to-blue-500"
-          initial={{ width: "0%" }}
-          animate={{ width: `${progress * 100}%` }}
-          transition={{ duration: 0.5 }}
-        />
-      </div>
+      {/* Main Content */}
+      <div className="flex-1 max-w-6xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Left 2 Columns: Guided Configuration Steps */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Step 1: Structure & Machine Preset */}
+          <section className="bg-[#0f1623] border border-slate-800 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-mono font-bold text-blue-400 uppercase tracking-wider">
+                1. Estructura Base & Cinemática Inicial
+              </h2>
+              <span className="text-[11px] font-mono text-slate-400">Se carga en Estudio XR/3D</span>
+            </div>
 
-      {/* Messages container */}
-      <div className="flex-1 overflow-y-auto px-6 py-8 space-y-4 custom-scrollbar">
-        <AnimatePresence mode="popLayout">
-          {messages.map((message, index) => (
-            <motion.div
-              key={message.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
-                  message.role === "user"
-                    ? "bg-purple-600 text-white"
-                    : "bg-slate-800 text-slate-100 border border-slate-700"
-                }`}
-              >
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              {MACHINE_PRESETS.map((item, idx) => {
+                const selected = idx === selectedPresetIdx;
+                return (
+                  <button
+                    key={item.label}
+                    onClick={() => handleSelectMachine(idx)}
+                    className={`p-3.5 rounded-xl border text-left transition-colors flex items-start gap-3 ${
+                      selected
+                        ? "bg-blue-600/15 border-blue-500 text-white"
+                        : "bg-slate-900/70 border-slate-800 text-slate-300 hover:border-slate-700"
+                    }`}
+                  >
+                    <Boxes
+                      size={18}
+                      className={`mt-0.5 shrink-0 ${selected ? "text-blue-400" : "text-slate-500"}`}
+                    />
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold">{item.label}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{item.subtitle}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
 
-                {/* Options */}
-                {message.options && message.role === "gopilot" && (
-                  <div className="mt-4 space-y-2">
-                    {message.options.map((option, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleOptionClick(option)}
-                        disabled={isLoading}
-                        className="w-full text-left px-3 py-2 text-sm bg-white/10 hover:bg-white/20 rounded transition disabled:opacity-50 flex items-center justify-between group"
-                      >
-                        <span>{option}</span>
-                        <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+            <div>
+              <label className="block text-[11px] font-mono text-slate-400 uppercase mb-1.5">
+                Nombre o Identificador de Estación
+              </label>
+              <input
+                type="text"
+                value={machineName}
+                onChange={(e) => setMachineName(e.target.value)}
+                placeholder="Ej. Fresadora Prototipo X1"
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+          </section>
 
-        {isLoading && (
-          <motion.div
-            className="flex justify-start"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <div className="bg-slate-800 border border-slate-700 px-4 py-3 rounded-lg">
-              <div className="flex gap-2">
-                <motion.div
-                  className="w-2 h-2 bg-purple-400 rounded-full"
-                  animate={{ y: [0, -8, 0] }}
-                  transition={{ duration: 0.6, repeat: Infinity }}
-                />
-                <motion.div
-                  className="w-2 h-2 bg-purple-400 rounded-full"
-                  animate={{ y: [0, -8, 0] }}
-                  transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
-                />
-                <motion.div
-                  className="w-2 h-2 bg-purple-400 rounded-full"
-                  animate={{ y: [0, -8, 0] }}
-                  transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
-                />
+          {/* Step 2: Multi-select Sensors */}
+          <section className="bg-[#0f1623] border border-slate-800 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-mono font-bold text-blue-400 uppercase tracking-wider">
+                2. Sensores y Visión Activos (Selección Múltiple)
+              </h2>
+              <span className="text-[11px] font-mono text-slate-400 tabular-nums">
+                {sensors.length} seleccionados
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {SENSOR_OPTIONS.map((sensor) => {
+                const active = sensors.includes(sensor.id);
+                const Icon = sensor.icon;
+                return (
+                  <button
+                    key={sensor.id}
+                    onClick={() => toggleSensor(sensor.id)}
+                    className={`p-3 rounded-xl border text-left transition-colors flex flex-col gap-1.5 ${
+                      active
+                        ? "bg-emerald-500/10 border-emerald-500/60 text-white"
+                        : "bg-slate-900/70 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <Icon size={15} className={active ? "text-emerald-400" : "text-slate-500"} />
+                      {active && <Check size={14} className="text-emerald-400" />}
+                    </div>
+                    <div className="text-xs font-semibold text-slate-100">{sensor.label}</div>
+                    <div className="text-[11px] text-slate-400">{sensor.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Step 3: Controller & AI Mode */}
+          <section className="bg-[#0f1623] border border-slate-800 rounded-xl p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <h2 className="text-xs font-mono font-bold text-blue-400 uppercase tracking-wider mb-2.5">
+                3. Enlace de Hardware
+              </h2>
+              <div className="space-y-2">
+                <button
+                  onClick={() => setHasArduino(true)}
+                  className={`w-full p-2.5 rounded-lg border text-left text-xs transition-colors ${
+                    hasArduino
+                      ? "bg-blue-600/15 border-blue-500 text-white"
+                      : "bg-slate-900 border-slate-800 text-slate-400"
+                  }`}
+                >
+                  <div className="font-semibold">Arduino / ESP32 / PLC (Web Serial)</div>
+                  <div className="text-[11px] text-slate-400">Habilita exportación de firmware y puerto USB</div>
+                </button>
+                <button
+                  onClick={() => setHasArduino(false)}
+                  className={`w-full p-2.5 rounded-lg border text-left text-xs transition-colors ${
+                    !hasArduino
+                      ? "bg-blue-600/15 border-blue-500 text-white"
+                      : "bg-slate-900 border-slate-800 text-slate-400"
+                  }`}
+                >
+                  <div className="font-semibold">Solo Gemelo Digital & Prototipado</div>
+                  <div className="text-[11px] text-slate-400">Simulación de ejes sin placa física conectada</div>
+                </button>
               </div>
             </div>
-          </motion.div>
-        )}
 
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input area */}
-      {currentStep === "machine-name" && (
-        <div className="border-t border-white/10 bg-black/40 backdrop-blur-sm px-6 py-4">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === "Enter" && userInput.trim()) {
-                  handleUserResponse(userInput);
-                }
-              }}
-              placeholder="Escribe el nombre de tu máquina..."
-              className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-              disabled={isLoading}
-            />
-            <button
-              onClick={() => userInput.trim() && handleUserResponse(userInput)}
-              disabled={isLoading || !userInput.trim()}
-              title="Enviar mensaje"
-              className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg px-4 py-2 transition flex items-center gap-2"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
+            <div>
+              <h2 className="text-xs font-mono font-bold text-blue-400 uppercase tracking-wider mb-2.5">
+                4. Motor de Análisis IA
+              </h2>
+              <div className="space-y-2">
+                {(
+                  [
+                    ["hybrid", "Híbrido (Cloud + Local)", "Máxima disponibilidad automática"],
+                    ["gemini", "Gemini Cloud API", "Análisis espacial y visión avanzada"],
+                    ["ollama", "Ollama Local (Port 11434)", "Ejecución 100% privada en red local"],
+                  ] as const
+                ).map(([key, title, desc]) => (
+                  <button
+                    key={key}
+                    onClick={() => setAiMode(key)}
+                    className={`w-full p-2 rounded-lg border text-left text-xs transition-colors ${
+                      aiMode === key
+                        ? "bg-blue-600/15 border-blue-500 text-white"
+                        : "bg-slate-900 border-slate-800 text-slate-400"
+                    }`}
+                  >
+                    <div className="font-semibold flex items-center gap-1.5">
+                      <Sparkles size={12} className="text-blue-400" /> {title}
+                    </div>
+                    <div className="text-[11px] text-slate-400">{desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
         </div>
-      )}
-    </motion.div>
+
+        {/* Right Column: Live Configuration Preview */}
+        <aside className="bg-[#0f1623] border border-slate-800 rounded-xl p-5 flex flex-col gap-4 sticky top-6">
+          <div className="border-b border-slate-800 pb-3">
+            <div className="text-[11px] font-mono text-blue-400 uppercase tracking-wider">
+              Resumen de Perfil
+            </div>
+            <h3 className="text-lg font-bold text-white mt-0.5">
+              {machineName.trim() || "Sin nombre"}
+            </h3>
+          </div>
+
+          <div className="space-y-3 text-xs font-mono">
+            <div className="flex justify-between py-1.5 border-b border-slate-800/80">
+              <span className="text-slate-400">Estructura 3D</span>
+              <span className="text-white text-right">{activePreset.label}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-slate-800/80">
+              <span className="text-slate-400">Controlador</span>
+              <span className="text-emerald-400">
+                {hasArduino ? "Arduino / WebSerial" : "Modo Virtual"}
+              </span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-slate-800/80">
+              <span className="text-slate-400">Backend IA</span>
+              <span className="text-cyan-300 uppercase">{aiMode}</span>
+            </div>
+            <div className="pt-1">
+              <span className="text-slate-400 block mb-2">Sensores Habilitados</span>
+              <div className="flex flex-wrap gap-1.5">
+                {sensors.length > 0 ? (
+                  sensors.map((s) => (
+                    <span
+                      key={s}
+                      className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200 text-[11px]"
+                    >
+                      {s.toUpperCase()}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-slate-500">Ninguno</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={handleFinish}
+            className="mt-2 w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors shadow-lg"
+          >
+            <span>Aplicar y Abrir Estudio</span>
+            <ChevronRight size={16} />
+          </button>
+
+          <button
+            onClick={onSkip}
+            className="w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-mono text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            Continuar con configuración por defecto
+          </button>
+        </aside>
+      </div>
+    </div>
   );
 }

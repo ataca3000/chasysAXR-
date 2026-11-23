@@ -1,43 +1,58 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  --font-display: "Space Grotesk", sans-serif;
+  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+  --surface-canvas: #070b12;
+  --surface-panel: #0f1623;
+  --surface-elevated: #162032;
+  --border-hairline: rgba(148, 163, 184, 0.16);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --accent-blue: #3b82f6;
 }
 
 @layer components {
   .glass-panel {
-    @apply bg-sky-100/40 backdrop-blur-md border border-sky-400/20 shadow-sm rounded-2xl relative overflow-hidden transition-all duration-300;
+    @apply bg-[#0f1623]/95 border border-slate-800/90 shadow-lg rounded-xl relative overflow-hidden transition-colors duration-200;
   }
-  
+
   .glass-panel:hover {
-    @apply bg-sky-100/60;
-    outline: 2px solid rgba(0,0,0,0.8);
-    outline-offset: 1px;
+    @apply border-slate-700/90;
+  }
+
+  .studio-card {
+    @apply bg-[#0f1623] border border-slate-800 rounded-xl;
   }
 }
 
 @layer utilities {
-  .text-neon-google {
-    text-shadow: 0 0 10px rgba(56, 189, 248, 0.6), 0 0 20px rgba(56, 189, 248, 0.4);
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
 @keyframes scan {
-  from { background-position: 0 0; }
-  to { background-position: 0 100vh; }
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 100vh;
+  }
 }
 
 body {
-  @apply bg-[#dbeafe] text-black font-sans;
+  background-color: var(--surface-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 @media (min-width: 768px) {
@@ -47,53 +62,63 @@ body {
 }
 
 @media (max-width: 767px) {
-  button, a {
+  button,
+  a {
     min-height: 44px;
   }
-
-  .custom-scrollbar {
-    scrollbar-width: thin;
-  }
 }
 
-button, a {
-  transition: all 0.3s ease;
+/* Clean custom scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
 }
 
-button:hover, a:hover {
-  outline: 2px solid rgba(0,0,0,0.8) !important;
-  outline-offset: 1px;
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-/* Force override dark classes to light for the pastel neon sky blue theme */
-.bg-zinc-950, .bg-black, .bg-zinc-900 {
-  background-color: transparent !important;
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.text-slate-300, .text-slate-200, .text-slate-400, .text-white, .text-slate-500, .text-slate-100 {
-  color: #000000 !important;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
 }
 
-.border-white\/10, .border-white\/20, .border-white\/5, .border-slate-800, .border-slate-700 {
-  border-color: rgba(0,0,0,0.1) !important;
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.45);
 }
 
-.bg-black\/60, .bg-black\/40, .bg-black\/80, .bg-black\/90, .bg-zinc-900\/50, .bg-zinc-900\/80 {
-  background-color: rgba(255,255,255,0.4) !important;
+/* Google brand utility tokens harmonized for dark industrial UI */
+.google-blue {
+  color: #60a5fa;
+}
+.google-red {
+  color: #f87171;
+}
+.google-yellow {
+  color: #fbbf24;
+}
+.google-green {
+  color: #34d399;
 }
 
-.bg-slate-900\/90, .bg-slate-950, .bg-slate-900, .bg-slate-800 {
-  background-color: #dbeafe !important;
+.bg-google-blue {
+  background-color: #2563eb;
+  color: #ffffff;
 }
-
-.google-blue { color: #000 !important; }
-.google-red { color: #d01d1d; }
-.google-yellow { color: #b68700; }
-.google-green { color: #177131; }
-
-.bg-google-blue { background-color: #7dd3fc !important; color: #000 !important; }
-.bg-google-red { background-color: #EA4335 !important; color: #fff !important; }
-.bg-google-yellow { background-color: #FBBC05 !important; color: #000 !important; }
-.bg-google-green { background-color: #34A853 !important; color: #fff !important; }
-
-
+.bg-google-red {
+  background-color: #dc2626;
+  color: #ffffff;
+}
+.bg-google-yellow {
+  background-color: #d97706;
+  color: #ffffff;
+}
+.bg-google-green {
+  background-color: #059669;
+  color: #ffffff;
+}

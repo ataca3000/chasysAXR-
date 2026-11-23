@@ -11,13 +11,15 @@ export function useOnboardingState() {
   );
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount (or bypass via ?autostart=1)
   useEffect(() => {
     try {
+      const params = new URLSearchParams(window.location.search);
+      const autostart = params.get("autostart") === "1";
       const stored = localStorage.getItem(ONBOARDING_KEY);
       const storedProfile = localStorage.getItem(MACHINE_PROFILE_KEY);
 
-      if (stored === "true") {
+      if (autostart || stored === "true") {
         setIsOnboardingComplete(true);
       }
 

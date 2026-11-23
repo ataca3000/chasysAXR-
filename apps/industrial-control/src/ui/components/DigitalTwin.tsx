@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, memo, Suspense } from 'react';
 import { Canvas, useFrame, useLoader } from '@react-three/fiber';
-import { OrbitControls, Box, Cylinder, Grid, ContactShadows, Environment, Html, Sphere, Sparkles, Edges, Center } from '@react-three/drei';
+import { OrbitControls, Box, Cylinder, Grid, ContactShadows, Environment, Sphere, Sparkles, Edges, Center } from '@react-three/drei';
+import { SafeHtml as Html } from './SafeHtml';
 import { EffectComposer, N8AO } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { LineChart, Line, YAxis, ResponsiveContainer } from 'recharts';
@@ -16,7 +17,7 @@ function Tooltip({ position, text, status, value, unit, history, dataKey, color,
   if (!arMode) {
     return (
       <Html position={position} center className="pointer-events-none z-50">
-        <div className="bg-slate-900/90 text-slate-100 p-2 rounded-lg text-xs font-mono border border-slate-700 shadow-lg whitespace-nowrap min-w-[max-content] backdrop-blur-md text-left">
+        <div className="bg-slate-900/95 text-slate-100 p-2 rounded-lg text-xs font-mono border border-slate-700 shadow-lg whitespace-nowrap min-w-[max-content] text-left">
           <div className="font-bold border-b border-slate-700 pb-1 mb-1 text-blue-400">{text}</div>
           <div className="text-slate-400">Status: <span className="text-white">{status}</span></div>
         </div>
@@ -31,7 +32,7 @@ function Tooltip({ position, text, status, value, unit, history, dataKey, color,
     <Html position={position} center className={`transition-all duration-300 pointer-events-auto ${isExpanded ? 'z-50' : 'z-40'}`}>
        <div
          onClick={(e) => { e.stopPropagation(); if(!forceExpanded) setExpanded(!expanded); }}
-         className={`cursor-pointer backdrop-blur-md border rounded-lg shadow-lg flex flex-col overflow-hidden transition-all duration-300 ${statusLevel === 'critical' ? 'bg-rose-900/90 border-rose-500' : 'bg-slate-900/90 border-slate-700'} ${isExpanded ? 'w-48' : 'w-auto'}`}
+         className={`cursor-pointer border rounded-lg shadow-lg flex flex-col overflow-hidden transition-all duration-300 ${statusLevel === 'critical' ? 'bg-rose-950/95 border-rose-500' : 'bg-slate-900/95 border-slate-700'} ${isExpanded ? 'w-48' : 'w-auto'}`}
        >
           <div className="p-2 flex items-center justify-between gap-2 whitespace-nowrap">
              <div className="flex items-center gap-2">
@@ -456,7 +457,7 @@ export const CustomCNC = memo(function CustomCNC({ position, label, telemetry, a
       )}
 
       <Html position={[0, 6, 0]} center>
-        <div className="bg-slate-900/90 text-slate-100 px-3 py-1.5 rounded-lg text-xs font-mono font-bold whitespace-nowrap border border-slate-700 backdrop-blur-md shadow-lg">
+        <div className="bg-slate-900/95 text-slate-100 px-3 py-1.5 rounded-lg text-xs font-mono font-bold whitespace-nowrap border border-slate-700 shadow-lg">
           {label}
         </div>
       </Html>
@@ -493,7 +494,7 @@ const IndustrialModel = memo(({ url }: { url: string }) => {
     }
 
     // Optimizamos sombras para todos los sub-componentes
-    object.traverse((child) => {
+    object.traverse((child: THREE.Object3D) => {
       if ((child as THREE.Mesh).isMesh) {
         child.castShadow = true;
         child.receiveShadow = true;
@@ -532,40 +533,56 @@ export default function DigitalTwin({ telemetry, arMode = false, history, enable
   const handleZoomOut = () => setSceneScale(s => Math.max(0.1, s - 0.1));
 
   return (
-    <div {...(arMode ? bind() as any : {})} className={`w-full h-full rounded-xl overflow-hidden relative border ${arMode ? 'bg-transparent border-transparent touch-none' : 'bg-slate-50 backdrop-blur-sm border-slate-300 shadow-inner'}`}>
-      <div className={`absolute top-4 left-4 z-10 font-mono text-sm tracking-wider flex flex-col gap-1 p-2 rounded-md ${arMode ? 'bg-slate-900 shadow-lg text-slate-100 border border-slate-700' : 'text-slate-600'}`}>
-        <span className="font-bold">[ MODE: 3D DIGITAL TWIN ]</span>
-        <span className={vibrStatus === 'warning' ? 'text-rose-600 font-bold' : 'text-emerald-600 font-bold'}>STATUS: {vibrStatus === 'warning' ? 'ANOMALY DETECTED' : 'OPERATIONAL'}</span>
+    <div {...(arMode ? bind() as any : {})} className={`w-full h-full rounded-xl overflow-hidden relative border ${arMode ? 'bg-transparent border-transparent touch-none' : 'bg-[#070b12] border-slate-800 shadow-inner'}`}>
+      <div className="absolute top-3 left-3 z-10 font-mono text-xs tracking-wider flex flex-col gap-0.5 px-3 py-2 rounded-lg bg-slate-900/95 text-slate-100 border border-slate-700/80 shadow-lg">
+        <span className="font-bold text-slate-200">{arMode ? 'MODO AR // SIN FONDO' : 'GEMELO DIGITAL 3D'}</span>
+        <span className={vibrStatus === 'warning' ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>
+          ESTADO: {vibrStatus === 'warning' ? 'ANOMALÍA DETECTADA' : 'OPERATIVO'}
+        </span>
       </div>
       
       {arMode && (
-         <div className="absolute bottom-6 right-6 z-20 flex flex-col gap-2 bg-slate-900/80 p-2 rounded-lg border border-slate-700 backdrop-blur-md shadow-lg">
-            <span className="text-[10px] text-slate-400 font-mono text-center mb-1">SCALE</span>
-            <button onClick={handleZoomIn} className="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-white rounded text-lg font-bold">+</button>
-            <span className="text-xs text-white font-mono text-center py-1">{sceneScale.toFixed(1)}x</span>
-            <button onClick={handleZoomOut} className="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-white rounded text-lg font-bold">-</button>
+         <div className="absolute bottom-5 right-5 z-20 flex flex-col gap-1.5 bg-slate-900/95 p-2 rounded-lg border border-slate-700 shadow-lg">
+            <span className="text-[10px] text-slate-400 font-mono text-center">ESCALA</span>
+            <button onClick={handleZoomIn} className="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-white rounded text-base font-bold">+</button>
+            <span className="text-xs text-white font-mono text-center py-0.5 tabular-nums">{sceneScale.toFixed(1)}x</span>
+            <button onClick={handleZoomOut} className="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-white rounded text-base font-bold">-</button>
          </div>
       )}
 
-      <Canvas camera={{ position: [-8, 6, 8], fov: 45 }}>
-        
-        <ambientLight intensity={0.2} />
-        <directionalLight position={[10, 10, 5]} intensity={1} color="#ffdddd" />
-        <pointLight position={[-10, -10, -10]} intensity={1} color="#aa0000" />
+      <Canvas
+        camera={{ position: [-8, 6, 8], fov: 45 }}
+        gl={{ alpha: true, antialias: true, preserveDrawingBuffer: true }}
+        onCreated={({ gl }) => {
+          gl.setClearColor(0x000000, arMode ? 0 : 1);
+        }}
+      >
+        <ambientLight intensity={arMode ? 0.55 : 0.3} />
+        <directionalLight position={[10, 10, 5]} intensity={1.1} color="#f8fafc" />
+        <pointLight position={[-10, -10, -10]} intensity={0.8} color="#3b82f6" />
         <pointLight position={[10, 0, 0]} intensity={2} color={tempStatus === 'warning' ? '#e11d48' : '#3b82f6'} distance={5} />
 
         <group scale={[sceneScale, sceneScale, sceneScale]}>
-          <Grid renderOrder={-1} position={[0, -0.01, 0]} infiniteGrid fadeDistance={20} sectionColor="#94a3b8" cellColor="#cbd5e1" />
+          <Grid
+            renderOrder={-1}
+            position={[0, -0.01, 0]}
+            infiniteGrid
+            fadeDistance={22}
+            sectionColor={arMode ? "#38bdf8" : "#334155"}
+            cellColor={arMode ? "#1e293b" : "#1e293b"}
+          />
 
-          {/* Industrial Dust Particles */}
-          <Sparkles count={800} scale={15} size={1.5} speed={0.4} opacity={0.2} color="#64748b" />
+          {!arMode && (
+            <>
+              <Sparkles count={400} scale={15} size={1.2} speed={0.3} opacity={0.18} color="#64748b" />
+              <Box args={[30, 0.1, 30]} position={[0, -0.1, 0]}>
+                <meshStandardMaterial color="#0b1120" metalness={0.3} roughness={0.85} transparent opacity={0.88} />
+              </Box>
+              <ContactShadows position={[0, 0, 0]} opacity={0.5} scale={20} blur={2} far={10} color="#000000" />
+            </>
+          )}
 
-          {/* Floor */}
-          <Box args={[30, 0.1, 30]} position={[0, -0.1, 0]}>
-           <meshStandardMaterial color="#f8fafc" metalness={0.1} roughness={0.8} transparent opacity={0.8} />
-          </Box>
-
-          <Suspense fallback={<Html center><div className="bg-slate-900/90 text-white p-3 rounded-lg font-mono text-[10px] border border-blue-500 animate-pulse">STREAMING_GEOMETRY...</div></Html>}>
+          <Suspense fallback={null}>
             {modelUrl ? (
                <Center top>
                  <IndustrialModel url={modelUrl} />
@@ -582,16 +599,16 @@ export default function DigitalTwin({ telemetry, arMode = false, history, enable
               />
             )}
           </Suspense>
-          
-          <ContactShadows position={[0, 0, 0]} opacity={0.6} scale={20} blur={2} far={10} color="#ff0000" />
         </group>
         
         <Environment preset="city" />
         <OrbitControls makeDefault minPolarAngle={0} maxPolarAngle={Math.PI / 2.1} enableZoom={!arMode} />
         
-        <EffectComposer>
-          <N8AO aoRadius={1} intensity={2} color="#000000" />
-        </EffectComposer>
+        {!arMode && (
+          <EffectComposer>
+            <N8AO aoRadius={1} intensity={1.8} color="#000000" />
+          </EffectComposer>
+        )}
       </Canvas>
     </div>
   );

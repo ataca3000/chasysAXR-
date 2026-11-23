@@ -383,41 +383,100 @@ export function VoiceAssistant({ onError }: { onError?: (msg: string) => void })
     }
   };
 
-  return (
-    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3">
-       
-       <div className="flex bg-black/60 border border-slate-700 backdrop-blur-md rounded-full shadow-[0_0_15px_rgba(0,0,0,0.5)] overflow-hidden mr-2">
-         <button 
-           onClick={() => { if(!isActive) setProvider('gemini')}}
-           className={`px-3 py-2 flex items-center gap-2 text-xs font-mono font-medium transition-all ${provider === 'gemini' ? 'bg-google-blue/30 text-white' : 'text-slate-400 hover:text-white'} ${isActive && provider !== 'gemini' ? 'opacity-50 cursor-not-allowed' : ''}`}
-         >
-           <Cloud size={14} /> Gemini
-         </button>
-         <button 
-           onClick={() => { if(!isActive) setProvider('ollama')}}
-           className={`px-3 py-2 flex items-center gap-2 text-xs font-mono font-medium transition-all ${provider === 'ollama' ? 'bg-emerald-600/30 text-white' : 'text-slate-400 hover:text-white'} ${isActive && provider !== 'ollama' ? 'opacity-50 cursor-not-allowed' : ''}`}
-         >
-           <Server size={14} /> Ollama Local
-         </button>
-       </div>
+  const [isExpanded, setIsExpanded] = useState(false);
 
-       {isActive && (
-         <div className={`bg-black/60 border backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-3 shadow-[0_0_15px_rgba(66,133,244,0.3)] min-w-[140px] justify-center ${provider === 'ollama' ? 'border-emerald-500/30' : 'border-google-blue/30'}`}>
-            <span className={`w-2.5 h-2.5 rounded-full ${status === 'Listening...' ? 'bg-rose-500 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.8)]' : status === 'Speaking...' ? (provider === 'ollama' ? 'bg-emerald-500 animate-bounce' : 'bg-google-blue animate-bounce') : 'bg-google-yellow'}`}></span>
-            <span className="font-mono text-xs text-white whitespace-nowrap font-medium tracking-widest">{status}</span>
-         </div>
-       )}
-       <button 
-         onClick={isActive ? stopVoice : startVoice}
-         title={isActive ? "Stop Voice Agent" : `Start ${provider} Voice Agent`}
-         className={`p-4 rounded-full transition-all shadow-lg ${isActive ? 'bg-rose-600/80 hover:bg-rose-600 border border-rose-500 shadow-[0_0_20px_rgba(234,67,53,0.4)]' : provider === 'ollama' ? 'bg-black/80 hover:bg-emerald-600/20 border border-emerald-600/50 shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:border-emerald-500' : 'bg-black/80 hover:bg-google-blue/20 border border-google-blue/50 shadow-[0_0_20px_rgba(66,133,244,0.2)] hover:border-google-blue'}`}
-       >
-         {isActive ? (
-           <MicOff className="text-white" size={24} />
-         ) : (
-           <Mic className={isActive ? 'text-white' : provider === 'ollama' ? 'text-emerald-500' : 'text-google-blue'} size={24} />
-         )}
-       </button>
+  return (
+    <div className="fixed bottom-4 right-4 z-40 flex items-center gap-2">
+      {(isExpanded || isActive) && (
+        <div className="flex items-center gap-2 bg-black/85 border border-slate-700 backdrop-blur-md rounded-full px-2 py-1.5 shadow-xl">
+          <div className="flex bg-slate-900 border border-slate-700/80 rounded-full overflow-hidden">
+            <button
+              type="button"
+              onClick={() => {
+                if (!isActive) setProvider('gemini');
+              }}
+              className={`px-2.5 py-1 flex items-center gap-1.5 text-[11px] font-mono font-medium transition-all ${
+                provider === 'gemini'
+                  ? 'bg-blue-600/30 text-white'
+                  : 'text-slate-400 hover:text-white'
+              } ${isActive && provider !== 'gemini' ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <Cloud size={12} /> Gemini
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!isActive) setProvider('ollama');
+              }}
+              className={`px-2.5 py-1 flex items-center gap-1.5 text-[11px] font-mono font-medium transition-all ${
+                provider === 'ollama'
+                  ? 'bg-emerald-600/30 text-white'
+                  : 'text-slate-400 hover:text-white'
+              } ${isActive && provider !== 'ollama' ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <Server size={12} /> Ollama
+            </button>
+          </div>
+
+          {isActive && (
+            <div className="px-2.5 py-1 rounded-full flex items-center gap-2 bg-slate-900/90 border border-slate-700">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  status === 'Listening...'
+                    ? 'bg-rose-500 animate-pulse'
+                    : status === 'Speaking...'
+                      ? 'bg-blue-500 animate-bounce'
+                      : 'bg-amber-400'
+                }`}
+              />
+              <span className="font-mono text-[11px] text-white whitespace-nowrap">
+                {status}
+              </span>
+            </div>
+          )}
+
+          {!isActive && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded(false)}
+              title="Minimizar asistente de voz"
+              className="px-2 py-1 text-[10px] font-mono text-slate-400 hover:text-white"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => {
+          if (isActive) {
+            stopVoice();
+          } else if (!isExpanded) {
+            setIsExpanded(true);
+          } else {
+            startVoice();
+          }
+        }}
+        title={
+          isActive
+            ? 'Detener Agente de Voz'
+            : isExpanded
+              ? `Iniciar Voz (${provider})`
+              : 'Abrir Asistente de Voz'
+        }
+        aria-label={isActive ? 'Detener Agente de Voz' : 'Asistente de Voz'}
+        className={`w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-lg ${
+          isActive
+            ? 'bg-rose-600 hover:bg-rose-500 border border-rose-400 text-white'
+            : provider === 'ollama'
+              ? 'bg-slate-950/90 hover:bg-emerald-600/20 border border-emerald-500/50 text-emerald-400'
+              : 'bg-slate-950/90 hover:bg-blue-600/20 border border-blue-500/50 text-blue-400'
+        }`}
+      >
+        {isActive ? <MicOff size={18} /> : <Mic size={18} />}
+      </button>
     </div>
   );
 }

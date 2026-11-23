@@ -21,7 +21,7 @@ export interface SpatialSuggestion {
 export function extractModelMetadata(object: THREE.Object3D) {
   const metadata: any[] = [];
 
-  object.traverse((node) => {
+  object.traverse((node: THREE.Object3D) => {
     const isMesh = (node as THREE.Mesh).isMesh;
     const isGroup = (node as THREE.Group).isGroup;
     if (isMesh || (isGroup && node.name)) {

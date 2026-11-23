@@ -1,5 +1,17 @@
-import mqtt from 'mqtt';
-import { parseCNCResponse } from '../hardware/cnc-protocol';
+import mqtt from "mqtt";
+import { parseCNCResponse } from "../hardware/cnc-protocol";
+import {
+  getAllKnownUsbFilters,
+  getBoardProfile,
+  getUsbFiltersForBoard,
+  parseObstacleTelemetry,
+} from "../hardware/boards";
+import {
+  FlashProgress,
+  flashMicroPythonRawRepl,
+  flashStk500v1,
+} from "../hardware/flasher";
+import { parsePinTelemetry, PinLiveState } from "../hardware/pinoutDefinitions";
 
 export interface TelemetryData {
   temp?: number;
@@ -8,28 +20,67 @@ export interface TelemetryData {
   vibration?: number;
   load?: number;
   flow?: number;
+  distanceCm?: number;
+  obstacleDetected?: boolean;
+  obstacleZone?: "left" | "center" | "right" | "all";
+  pins?: PinLiveState[];
   cncStatus?: string;
   cncOk?: boolean;
   cncErrorCode?: number;
   cncAlarmCode?: number;
   position?: { x: number; y: number; z: number };
-  [key: string]: any; // Allow other parsed JSON fields
+  [key: string]: any;
+}
+
+export interface SerialConnectConfig {
+  boardId?: string;
+  baudRate?: number;
+  filterMode?: "board" | "known" | "all";
 }
 
 export class HardwareController {
-  private readonly simulationEnabled: boolean;
   private port: any | null = null;
   private writer: WritableStreamDefaultWriter<string> | null = null;
+  private writerPipeClosed: Promise<void> | null = null;
+  private textEncoderAbort: AbortController | null = null;
+  private activeReader: ReadableStreamDefaultReader<string> | null = null;
+  private readerPipeClosed: Promise<void> | null = null;
   private ws: WebSocket | null = null;
   private mqttClient: mqtt.MqttClient | null = null;
 
+  private activeBoardId = "arduino_nano";
+  private activeBaudRate = 115200;
+  private activePortInfo: { usbVendorId?: number; usbProductId?: number } | null = null;
+  private isReading = false;
+
   private sensorListeners: Set<(data: TelemetryData) => void> = new Set();
   private rawDataListeners: Set<(data: string) => void> = new Set();
+  private connectionListeners: Set<(connected: boolean) => void> = new Set();
   onSensorData: ((data: TelemetryData) => void) | null = null;
   onError: ((error: string) => void) | null = null;
 
-  constructor(options?: { simulation?: boolean }) {
-    this.simulationEnabled = options?.simulation ?? import.meta.env.VITE_HARDWARE_SIMULATION === 'true';
+  constructor(_options?: { simulation?: boolean }) {
+    // Hardware controller strictly reports real incoming telemetry from USB Serial / MQTT / WebSocket.
+  }
+
+  isConnected(): boolean {
+    return Boolean(this.port || this.ws?.readyState === WebSocket.OPEN || this.mqttClient?.connected);
+  }
+
+  isSerialConnected(): boolean {
+    return Boolean(this.port);
+  }
+
+  getBoardId(): string {
+    return this.activeBoardId;
+  }
+
+  getBaudRate(): number {
+    return this.activeBaudRate;
+  }
+
+  getPortInfo() {
+    return this.activePortInfo;
   }
 
   addSensorListener(cb: (data: TelemetryData) => void) {
@@ -46,118 +97,208 @@ export class HardwareController {
     };
   }
 
-  emitSensorData(data: TelemetryData) {
-    if (this.onSensorData) this.onSensorData(data);
-    this.sensorListeners.forEach(cb => cb(data));
+  addConnectionListener(cb: (connected: boolean) => void) {
+    this.connectionListeners.add(cb);
+    return () => {
+      this.connectionListeners.delete(cb);
+    };
   }
 
-  private isReading = false;
+  private notifyConnection() {
+    const state = this.isConnected();
+    this.connectionListeners.forEach((cb) => cb(state));
+  }
+
+  emitSensorData(data: TelemetryData) {
+    if (this.onSensorData) this.onSensorData(data);
+    this.sensorListeners.forEach((cb) => cb(data));
+  }
 
   async connectStream(url: string, topic?: string) {
     if (!url) {
-      if (this.onError) this.onError('Connection failed: Empty URL provided');
+      if (this.onError) this.onError("Connection failed: Empty URL provided");
       return false;
     }
 
     return new Promise<boolean>((resolve) => {
       try {
-        const protocol = url.split(':')[0];
-        if (['mqtt', 'ws', 'wss'].includes(protocol)) {
-          if (protocol === 'mqtt' || topic) {
+        const protocol = url.split(":")[0];
+        if (["mqtt", "ws", "wss"].includes(protocol)) {
+          if (protocol === "mqtt" || topic) {
             this.mqttClient = mqtt.connect(url, {
               connectTimeout: 5000,
-              reconnectPeriod: 2000
+              reconnectPeriod: 2000,
             });
-            this.mqttClient.on('connect', () => {
-              console.log('Connected to MQTT Broker:', url);
+            this.mqttClient.on("connect", () => {
               if (topic) this.mqttClient?.subscribe(topic);
-              else this.mqttClient?.subscribe('#');
+              else this.mqttClient?.subscribe("#");
+              this.notifyConnection();
               resolve(true);
             });
-            this.mqttClient.on('error', (err) => {
-              console.error('MQTT Error:', err);
+            this.mqttClient.on("error", (err) => {
               if (this.onError) this.onError(`MQTT Error: ${err.message}`);
               resolve(false);
             });
-            this.mqttClient.on('message', (_receivedTopic, message) => {
+            this.mqttClient.on("message", (_receivedTopic, message) => {
               try {
-                const msg = message.toString();
-                this.parseHardwareData(msg);
+                this.parseHardwareData(message.toString());
               } catch (e) {
-                console.error('Error processing MQTT message:', e);
+                console.error("Error processing MQTT message:", e);
               }
             });
           } else {
             this.ws = new WebSocket(url);
             this.ws.onopen = () => {
-              console.log('Connected to WebSocket:', url);
+              this.notifyConnection();
               resolve(true);
             };
-            this.ws.onerror = (e) => {
-              console.error('WebSocket Error:', e);
-              if (this.onError) this.onError('WebSocket connection failed. Verify URL and network.');
+            this.ws.onerror = () => {
+              if (this.onError)
+                this.onError("WebSocket connection failed. Verify URL and network.");
               resolve(false);
             };
             this.ws.onmessage = (event) => {
               try {
                 this.parseHardwareData(event.data);
               } catch (e) {
-                console.error('Error processing WebSocket message:', e);
+                console.error("Error processing WebSocket message:", e);
               }
             };
           }
         } else {
-          throw new Error(`Unsupported protocol: ${protocol}. Use ws://, wss:// or mqtt://`);
+          throw new Error(
+            `Unsupported protocol: ${protocol}. Use ws://, wss:// or mqtt://`,
+          );
         }
       } catch (err: any) {
-         console.error('Stream connection setup error:', err);
-         if (this.onError) this.onError(`Setup failed: ${err.message}`);
-         resolve(false);
+        if (this.onError) this.onError(`Setup failed: ${err.message}`);
+        resolve(false);
       }
     });
   }
 
-  async connect() {
+  async connect(config: SerialConnectConfig = {}) {
     const nav = navigator as any;
-    if (!('serial' in nav)) {
-      const errorMsg = 'Web Serial API is not supported in this environment.';
-      console.error(errorMsg);
+    if (!("serial" in nav)) {
+      const errorMsg = "Web Serial API no está soportada en este navegador.";
       if (this.onError) this.onError(errorMsg);
       return false;
     }
 
     try {
-      this.port = await nav.serial.requestPort();
-      await this.port.open({ baudRate: 115200 });
-      
-      const textEncoder = new TextEncoderStream();
-      textEncoder.readable.pipeTo(this.port.writable as WritableStream).catch(e => {
-        console.error('Writable stream error:', e);
-        if (this.onError) this.onError(`Serial write error: ${e.message}`);
-      });
-      this.writer = textEncoder.writable.getWriter();
+      if (this.port) {
+        await this.disconnect();
+      }
 
-      this.isReading = true;
-      this.readLoop();
+      const boardId = config.boardId || this.activeBoardId;
+      const profile = getBoardProfile(boardId);
+      const baudRate = config.baudRate || profile.defaultBaud || 115200;
+      const filterMode = config.filterMode || "known";
 
-      console.log('Successfully connected to serial hardware.');
+      const requestOptions =
+        filterMode === "all"
+          ? undefined
+          : {
+              filters:
+                filterMode === "board"
+                  ? getUsbFiltersForBoard(boardId)
+                  : getAllKnownUsbFilters(),
+            };
+
+      this.port = requestOptions
+        ? await nav.serial.requestPort(requestOptions)
+        : await nav.serial.requestPort();
+
+      await this.port.open({ baudRate });
+      this.activeBoardId = boardId;
+      this.activeBaudRate = baudRate;
+      this.activePortInfo =
+        typeof this.port.getInfo === "function" ? this.port.getInfo() : null;
+
+      await this.attachStreams();
+      this.notifyConnection();
       return true;
     } catch (err: any) {
-      console.error('Serial connection error:', err);
-      if (this.onError) this.onError(`Hardware connection failed: ${err.message || 'Unknown error'}`);
+      if (this.onError)
+        this.onError(
+          `Conexión USB fallida: ${err.message || "Puerto no seleccionado"}`,
+        );
       return false;
+    }
+  }
+
+  private async attachStreams() {
+    if (!this.port) return;
+
+    if (this.port.writable && !this.port.writable.locked) {
+      const textEncoder = new TextEncoderStream();
+      this.textEncoderAbort = new AbortController();
+      this.writerPipeClosed = textEncoder.readable
+        .pipeTo(this.port.writable as WritableStream, {
+          signal: this.textEncoderAbort.signal,
+        })
+        .catch(() => {
+          // Aborted cleanly during flash or disconnect
+        });
+      this.writer = textEncoder.writable.getWriter();
+    }
+
+    if (this.port.readable && !this.port.readable.locked) {
+      this.isReading = true;
+      this.readLoop();
+    }
+  }
+
+  private async detachStreamsForFlashOrClose() {
+    this.isReading = false;
+
+    if (this.activeReader) {
+      try {
+        await this.activeReader.cancel();
+      } catch {}
+      try {
+        this.activeReader.releaseLock();
+      } catch {}
+      this.activeReader = null;
+    }
+
+    if (this.readerPipeClosed) {
+      await this.readerPipeClosed.catch(() => {});
+      this.readerPipeClosed = null;
+    }
+
+    if (this.writer) {
+      try {
+        await this.writer.close();
+      } catch {}
+      try {
+        this.writer.releaseLock();
+      } catch {}
+      this.writer = null;
+    }
+
+    if (this.textEncoderAbort) {
+      this.textEncoderAbort.abort();
+      this.textEncoderAbort = null;
+    }
+
+    if (this.writerPipeClosed) {
+      await this.writerPipeClosed.catch(() => {});
+      this.writerPipeClosed = null;
     }
   }
 
   private async readLoop() {
     if (!this.port || !this.port.readable) return;
-    
-    // We create a decoder that splits the stream by strings
-    const textDecoder = new TextDecoderStream();
-    this.port.readable.pipeTo(textDecoder.writable);
-    const reader = textDecoder.readable.getReader();
 
-    let buffer = '';
+    const textDecoder = new TextDecoderStream();
+    this.readerPipeClosed = this.port.readable
+      .pipeTo(textDecoder.writable)
+      .catch(() => {});
+    const reader = textDecoder.readable.getReader();
+    this.activeReader = reader;
+
+    let buffer = "";
 
     try {
       while (this.isReading) {
@@ -165,182 +306,201 @@ export class HardwareController {
         if (done) break;
         if (value) {
           buffer += value;
-          let lines = buffer.split('\n');
-          // keep the last incomplete chunk in the buffer
-          buffer = lines.pop() || '';
-          
+          const lines = buffer.split(/\r?\n/);
+          buffer = lines.pop() || "";
+
           for (const line of lines) {
             const trimmed = line.trim();
             if (trimmed) {
-              console.log('📬 ARDUINO RX:', trimmed);
               this.parseHardwareData(trimmed);
             }
           }
         }
       }
     } catch (error) {
-      console.error('Error leyendo del puerto serial:', error);
+      if (this.isReading) {
+        console.error("Error leyendo del puerto serial:", error);
+      }
     } finally {
-      reader.releaseLock();
+      try {
+        reader.releaseLock();
+      } catch {}
+      if (this.activeReader === reader) {
+        this.activeReader = null;
+      }
+    }
+  }
+
+  async setDtrRts(dtr: boolean, rts: boolean) {
+    if (!this.port || typeof this.port.setSignals !== "function") {
+      throw new Error("No hay puerto USB conectado o no soporta señales DTR/RTS.");
+    }
+    await this.port.setSignals({
+      dataTerminalReady: dtr,
+      requestToSend: rts,
+    });
+  }
+
+  async resetBoardPulse() {
+    await this.setDtrRts(false, false);
+    await new Promise((r) => setTimeout(r, 80));
+    await this.setDtrRts(true, true);
+  }
+
+  async fastFlashFirmware(
+    protocol: "micropython_repl" | "stk500v1",
+    code: string,
+    filename: string,
+    onProgress?: (p: FlashProgress) => void,
+  ) {
+    if (!this.port) {
+      throw new Error("Conecta primero tu placa Arduino o Raspberry Pi por USB Serial.");
+    }
+
+    await this.detachStreamsForFlashOrClose();
+    try {
+      if (protocol === "micropython_repl") {
+        return await flashMicroPythonRawRepl(this.port, code, filename, onProgress);
+      }
+      return await flashStk500v1(this.port, code, onProgress);
+    } finally {
+      await this.attachStreams();
     }
   }
 
   private parseHardwareData(data: string) {
     if (!data) return;
-    this.rawDataListeners.forEach(cb => cb(data));
+    this.rawDataListeners.forEach((cb) => cb(data));
 
     const trimmed = data.trim();
-    if (trimmed.startsWith('<') || /^(ok|error:|alarm:)/i.test(trimmed)) {
-      const cnc = parseCNCResponse(trimmed);
-      this.emitSensorData({
-        cncStatus: cnc.status,
-        cncOk: cnc.ok,
-        cncErrorCode: cnc.errorCode,
-        cncAlarmCode: cnc.alarmCode,
-        position: cnc.position,
-      });
-      return;
+    const combinedPayload: TelemetryData = {};
+    let hasStructuredData = false;
+
+    // 1. Parse pin telemetry (PIN:D9=1, PWM:D5=180, A0:512, JSON pins)
+    const parsedPins = parsePinTelemetry(trimmed);
+    if (parsedPins.length > 0) {
+      combinedPayload.pins = parsedPins;
+      hasStructuredData = true;
     }
 
+    // 2. Parse obstacle / ultrasonic / LiDAR telemetry
+    const obstacle = parseObstacleTelemetry(trimmed);
+    if (obstacle) {
+      if (obstacle.distanceCm !== undefined)
+        combinedPayload.distanceCm = obstacle.distanceCm;
+      if (obstacle.obstacleDetected !== undefined)
+        combinedPayload.obstacleDetected = obstacle.obstacleDetected;
+      if (obstacle.zone) combinedPayload.obstacleZone = obstacle.zone;
+      hasStructuredData = true;
+    }
+
+    // 3. Parse GRBL/CNC status
+    if (trimmed.startsWith("<") || /^(ok|error:|alarm:)/i.test(trimmed)) {
+      const cnc = parseCNCResponse(trimmed);
+      combinedPayload.cncStatus = cnc.status;
+      combinedPayload.cncOk = cnc.ok;
+      combinedPayload.cncErrorCode = cnc.errorCode;
+      combinedPayload.cncAlarmCode = cnc.alarmCode;
+      combinedPayload.position = cnc.position;
+      hasStructuredData = true;
+    }
+
+    // 4. Parse JSON or numeric sensor tokens
     try {
-      // Intentar forzar parseo JSON por si es un payload estructurado
-      const parsed = JSON.parse(data);
-      
-      // Buscar recursivamente las métricas que nos importan dentro de la estructura (ej: AWS IoT envueltos)
+      const parsed = JSON.parse(trimmed);
       const extractMetrics = (obj: any): any => {
-         let result: any = {};
-         for (const key in obj) {
-            if (typeof obj[key] === 'object' && obj[key] !== null) {
-               Object.assign(result, extractMetrics(obj[key]));
-            } else if (typeof obj[key] === 'number') {
-               const k = key.toLowerCase();
-               if (k === 'temp' || k === 'temperature') result.temperature = obj[key];
-               if (k === 'vib' || k === 'vibration') result.vibration = obj[key];
-               if (k === 'load' || k === 'rpm') result.load = obj[key];
-            }
-         }
-         return result;
+        const result: any = {};
+        for (const key in obj) {
+          if (typeof obj[key] === "object" && obj[key] !== null && key !== "pins") {
+            Object.assign(result, extractMetrics(obj[key]));
+          } else if (typeof obj[key] === "number") {
+            const k = key.toLowerCase();
+            if (k === "temp" || k === "temperature") result.temperature = obj[key];
+            if (k === "vib" || k === "vibration") result.vibration = obj[key];
+            if (k === "load" || k === "rpm") result.load = obj[key];
+            if (k === "flow") result.flow = obj[key];
+          }
+        }
+        return result;
       };
 
       const extracted = extractMetrics(parsed);
-      
-      // Si logramos extraer algo útil, lo emitimos
-      if (extracted.temperature !== undefined || extracted.vibration !== undefined || extracted.load !== undefined) {
-          this.emitSensorData(extracted);
-          return;
+      if (
+        extracted.temperature !== undefined ||
+        extracted.vibration !== undefined ||
+        extracted.load !== undefined ||
+        extracted.flow !== undefined
+      ) {
+        Object.assign(combinedPayload, extracted);
+        hasStructuredData = true;
+      } else if (!hasStructuredData && typeof parsed === "object" && parsed !== null) {
+        this.emitSensorData(parsed);
+        return;
       }
-      // Si no, emitimos el objeto crudo por si otra capa lo necesita
-      this.emitSensorData(parsed);
+    } catch {
+      const tempMatch = trimmed.match(/(?:^|[\s,])(?:T|TEMP|TEMPERATURE)[:=\s]*([\d.-]+)/i);
+      const vibeMatch = trimmed.match(/(?:^|[\s,])(?:V|VIB|VIBRATION)[:=\s]*([\d.-]+)/i);
+      const loadMatch = trimmed.match(/(?:^|[\s,])(?:L|LOAD|RPM)[:=\s]*([\d.-]+)/i);
+      const flowMatch = trimmed.match(/(?:^|[\s,])(?:FLOW|CAUDAL)[:=\s]*([\d.-]+)/i);
 
-    } catch (e) {
-      // No era JSON, usar expresiones regulares robustas para data serial convencional
-      let tempMatch = data.match(/(?:T|TEMP|TEMPERATURE)[:=\s]*([\d.-]+)/i);
-      let vibeMatch = data.match(/(?:V|VIB|VIBRATION)[:=\s]*([\d.-]+)/i);
-      let loadMatch = data.match(/(?:L|LOAD|RPM)[:=\s]*([\d.-]+)/i);
-
-      let payload: any = {};
-      let hasData = false;
-
-      if (tempMatch) { payload.temperature = parseFloat(tempMatch[1]); hasData = true; }
-      if (vibeMatch) { payload.vibration = parseFloat(vibeMatch[1]); hasData = true; }
-      if (loadMatch) { payload.load = parseFloat(loadMatch[1]); hasData = true; }
-
-      if (hasData) {
-        this.emitSensorData(payload);
+      if (tempMatch) {
+        combinedPayload.temperature = parseFloat(tempMatch[1]);
+        hasStructuredData = true;
       }
+      if (vibeMatch) {
+        combinedPayload.vibration = parseFloat(vibeMatch[1]);
+        hasStructuredData = true;
+      }
+      if (loadMatch) {
+        combinedPayload.load = parseFloat(loadMatch[1]);
+        hasStructuredData = true;
+      }
+      if (flowMatch) {
+        combinedPayload.flow = parseFloat(flowMatch[1]);
+        hasStructuredData = true;
+      }
+    }
+
+    if (hasStructuredData) {
+      this.emitSensorData(combinedPayload);
     }
   }
 
   async sendCommand(gcode: string, fromSyncQueue: boolean = false) {
-    if (typeof window !== 'undefined' && !navigator.onLine && !fromSyncQueue) {
-      console.warn('[HardwareController] Device is offline. Queueing command:', gcode);
-      const { offlineSync } = await import('./offlineSync');
-      offlineSync.addTask('local_machine', 'sendCommand', { gcode });
-      return;
+    if (typeof window !== "undefined" && !navigator.onLine && !fromSyncQueue) {
+      const { offlineSync } = await import("./offlineSync");
+      offlineSync.addTask("local_machine", "sendCommand", { gcode });
+      return false;
     }
 
-    console.log(`Enviando a máquina: ${gcode}`);
     try {
       if (this.writer) {
-        await this.writer.write(gcode + '\n');
+        await this.writer.write(gcode + "\n");
         return true;
       }
 
-      if (this.simulationEnabled) {
-        console.warn('Simulando envío de comando G-CODE:', gcode);
-        // Wait for simulation
-        await new Promise(resolve => setTimeout(resolve, 500));
-        this.simulateGCodeEffect(gcode);
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(gcode);
         return true;
       }
 
-      const error = 'Hardware no conectado. Conecta un dispositivo o activa VITE_HARDWARE_SIMULATION para laboratorio.';
+      if (this.mqttClient && this.mqttClient.connected) {
+        this.mqttClient.publish("industrial/commands", gcode);
+        return true;
+      }
+
+      const error =
+        "Hardware no conectado. Conecta tu Arduino o Raspberry Pi vía USB Serial o MQTT/WS.";
       if (this.onError) this.onError(error);
       return false;
     } catch (err: any) {
-      console.error('Error enviando comando:', err);
-      if (!fromSyncQueue && typeof window !== 'undefined') {
-         console.warn('[HardwareController] Command failed. Queueing for retry:', gcode);
-         const { offlineSync } = await import('./offlineSync');
-         offlineSync.addTask('local_machine', 'sendCommand', { gcode });
+      if (!fromSyncQueue && typeof window !== "undefined") {
+        const { offlineSync } = await import("./offlineSync");
+        offlineSync.addTask("local_machine", "sendCommand", { gcode });
       }
-      if (this.onError) this.onError(`Command failed: ${err.message || 'Port disconnected'}`);
+      if (this.onError)
+        this.onError(`Command failed: ${err.message || "Port disconnected"}`);
       return false;
-    }
-  }
-
-  // Interprete virtual de G-code para simular la respuesta de los sensores al comando
-  private simulateGCodeEffect(gcode: string) {
-    const upperCmd = gcode.toUpperCase();
-    
-    let tempDiff = 0;
-    let vibDiff = 0;
-    let loadDiff = 0;
-
-    // Reducir avance o detener
-    if (upperCmd.includes('M5') || upperCmd.includes('M05')) { // Parada del cabezal
-       tempDiff = -200;
-       vibDiff = -3;
-       loadDiff = -40;
-    } else if (upperCmd.includes('M0') || upperCmd.includes('M112')) { // Pausa o Parada de emergencia
-       tempDiff = -300;
-       vibDiff = -5;
-       loadDiff = -80;
-    } 
-
-    if (upperCmd.includes('F')) {
-       // Feedrate detectado
-       const match = upperCmd.match(/F(\d+)/);
-       if (match && parseInt(match[1]) < 1000) {
-         tempDiff -= 50;
-         vibDiff -= 1;
-       }
-    }
-
-    if (upperCmd.includes('S')) {
-       // Spindle speed
-       const match = upperCmd.match(/S(\d+)/);
-       if (match && parseInt(match[1]) < 5000) {
-         tempDiff -= 100;
-         vibDiff -= 1.5;
-         loadDiff -= 20;
-       }
-    }
-
-    if (tempDiff !== 0 || vibDiff !== 0 || loadDiff !== 0) {
-       console.log(`Interpreter: applying virtual telemetry diff`, {tempDiff, vibDiff, loadDiff});
-       // Send a delta packet or absolute reading to App.tsx
-       // We'll rely on App's state updater logic which currently might just override.
-       // So we'll emit an event that signifies a "trend" or specific value drop. 
-       // For a robust simulation, we'd keep true state here, but let's just trigger a sudden drop
-       this.emitSensorData({
-         temp: 350,   // Forced safe values for simulation
-         vib: 1.5,
-         load: 35
-       });
-       this.rawDataListeners.forEach(cb => cb(`ok (simulated effect)`));
-    } else {
-       this.rawDataListeners.forEach(cb => cb(`ok`));
     }
   }
 
@@ -353,31 +513,31 @@ export class HardwareController {
       this.ws.close();
       this.ws = null;
     }
-    if (this.writer) {
-      this.writer.releaseLock();
-    }
+    await this.detachStreamsForFlashOrClose();
     if (this.port) {
-      await this.port.close();
+      try {
+        await this.port.close();
+      } catch {}
       this.port = null;
     }
-    console.log('Desconectado del hardware.');
+    this.activePortInfo = null;
+    this.notifyConnection();
   }
 
-  // Comandos de automatización predefinidos
   async emergencyStop() {
-    return this.sendCommand('M112'); // Parada de emergencia estándar
+    return this.sendCommand("M112");
   }
 
   async startSpindle(rpm: number) {
-    await this.sendCommand(`M3 S${rpm}`); // Iniciar husillo
+    return this.sendCommand(`M3 S${rpm}`);
   }
 
   async stopSpindle() {
-    await this.sendCommand('M5'); // Detener husillo
+    return this.sendCommand("M5");
   }
 
   async moveTo(x: number, y: number, z: number, feedrate: number) {
-    await this.sendCommand(`G1 X${x} Y${y} Z${z} F${feedrate}`);
+    return this.sendCommand(`G1 X${x} Y${y} Z${z} F${feedrate}`);
   }
 }
 
